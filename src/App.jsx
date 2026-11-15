@@ -28,15 +28,9 @@ import { addMonthsToDate, getTodayDateString } from './utils/dateUtils';
 
 export default function App() {
   const [user, setUser] = useState(null);
-  const [isDemoMode, setIsDemoMode] = useState(true);
-  const [clients, setClients] = useState(() => {
-    const saved = localStorage.getItem('pz8_demo_clients');
-    return saved ? JSON.parse(saved) : INITIAL_CLIENTS;
-  });
-  const [creditData, setCreditData] = useState(() => {
-    const saved = localStorage.getItem('pz8_demo_credits');
-    return saved ? JSON.parse(saved) : INITIAL_CREDIT_STATE;
-  });
+  const [authLoading, setAuthLoading] = useState(true);
+  const [clients, setClients] = useState([]);
+  const [creditData, setCreditData] = useState({ creditsBalance: 0, creditCostUnit: 3.0, history: [] });
 
   const [filterTab, setFilterTab] = useState('all');
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
@@ -47,7 +41,7 @@ export default function App() {
 
   // Admin access control (Mirko Polliotto)
   const ADMIN_EMAILS = ['polliotto.mirko@gmail.com'];
-  const isAdmin = isDemoMode || (user && ADMIN_EMAILS.includes(user.email?.toLowerCase()));
+  const isAdmin = user && ADMIN_EMAILS.includes(user.email?.toLowerCase());
 
   // Column visibility settings (individual per user)
   const [visibleColumns, setVisibleColumns] = useState(() => {
@@ -78,19 +72,20 @@ export default function App() {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
         setUser(currentUser);
-        setIsDemoMode(false);
-        notify(`Accesso effettuato come ${currentUser.displayName || currentUser.email}`, 'success');
+        notify(`Benvenuto ${currentUser.displayName || currentUser.email}!`, 'success');
       } else {
         setUser(null);
-        setIsDemoMode(true);
+        setClients([]);
+        setCreditData({ creditsBalance: 0, creditCostUnit: 3.0, history: [] });
       }
+      setAuthLoading(false);
     });
     return () => unsubscribe();
   }, []);
 
   // 2. Real-time sync with Firestore when user is logged in
   useEffect(() => {
-    if (!user || isDemoMode) return;
+    if (!user) return;
 
     // A. Sync Clients Subcollection: /users/{uid}/clients
     const clientsRef = collection(db, 'users', user.uid, 'clients');
@@ -132,26 +127,7 @@ export default function App() {
       unsubProfile();
       unsubSettings();
     };
-  }, [user, isDemoMode]);
-
-  // 3. Save to localStorage in Demo Mode
-  useEffect(() => {
-    if (isDemoMode) {
-      localStorage.setItem('pz8_demo_clients', JSON.stringify(clients));
-    }
-  }, [clients, isDemoMode]);
-
-  useEffect(() => {
-    if (isDemoMode) {
-      localStorage.setItem('pz8_demo_credits', JSON.stringify(creditData));
-    }
-  }, [creditData, isDemoMode]);
-
-  useEffect(() => {
-    if (isDemoMode) {
-      localStorage.setItem('pz8_visible_columns', JSON.stringify(visibleColumns));
-    }
-  }, [visibleColumns, isDemoMode]);
+  }, [user]);
 
   const handleToggleColumn = async (columnId) => {
     const updated = {
@@ -159,7 +135,7 @@ export default function App() {
       [columnId]: !visibleColumns[columnId]
     };
     setVisibleColumns(updated);
-    if (!isDemoMode && user) {
+    if (user) {
       await setDoc(doc(db, 'users', user.uid, 'settings', 'data'), { visibleColumns: updated }, { merge: true });
     } else {
       localStorage.setItem('pz8_visible_columns', JSON.stringify(updated));
@@ -179,8 +155,9 @@ export default function App() {
   const handleLogout = async () => {
     await signOut(auth);
     setUser(null);
-    setIsDemoMode(true);
-    notify("Disconnesso. Modalità Demo attiva.", 'info');
+    setClients([]);
+    setCreditData({ creditsBalance: 0, creditCostUnit: 3.0, history: [] });
+    notify("Disconnesso.", 'info');
   };
 
   // Add / Edit Client
@@ -194,10 +171,8 @@ export default function App() {
 
     if (clientToEdit) {
       // EDIT EXISTING
-      if (!isDemoMode && user) {
+      if (user) {
         await updateDoc(doc(db, 'users', user.uid, 'clients', clientToEdit.id), clientFields);
-      } else {
-        setClients(prev => prev.map(c => c.id === clientToEdit.id ? { ...c, ...clientFields } : c));
       }
       notify(`Utente "${clientFields.user}" salvato.`, 'success');
     } else {
@@ -208,14 +183,8 @@ export default function App() {
         lastRenewal: null
       };
 
-      if (!isDemoMode && user) {
+      if (user) {
         await addDoc(collection(db, 'users', user.uid, 'clients'), newClientRecord);
-      } else {
-        const newClient = {
-          id: 'c_' + Date.now(),
-          ...newClientRecord
-        };
-        setClients(prev => [newClient, ...prev]);
       }
 
       if (deductCredits > 0) {
@@ -263,15 +232,13 @@ export default function App() {
       lastRenewal: renewalRecord
     };
 
-    if (!isDemoMode && user) {
+    if (user) {
       await updateDoc(doc(db, 'users', user.uid, 'clients', client.id), {
         expirationDate: newExpiration,
         isActive: true,
         totalCreditsUsed: (client.totalCreditsUsed || 0) + months,
         lastRenewal: renewalRecord
       });
-    } else {
-      setClients(prev => prev.map(c => c.id === client.id ? updatedClient : c));
     }
 
     handleDeductCredits(months, `Rinnovo +${months}M per "${client.user}"`);
@@ -298,14 +265,12 @@ export default function App() {
       lastRenewal: null
     };
 
-    if (!isDemoMode && user) {
+    if (user) {
       await updateDoc(doc(db, 'users', user.uid, 'clients', client.id), {
         expirationDate: prevExpirationDate,
         totalCreditsUsed: Math.max(0, (client.totalCreditsUsed || 0) - months),
         lastRenewal: null
       });
-    } else {
-      setClients(prev => prev.map(c => c.id === client.id ? revertedClient : c));
     }
 
     // Refund credits
@@ -319,10 +284,8 @@ export default function App() {
     if (!client) return;
     const newStatus = !client.isActive;
 
-    if (!isDemoMode && user) {
+    if (user) {
       await updateDoc(doc(db, 'users', user.uid, 'clients', clientId), { isActive: newStatus });
-    } else {
-      setClients(prev => prev.map(c => c.id === clientId ? { ...c, isActive: newStatus } : c));
     }
     notify(`Stato di "${client.user}" impostato su ${newStatus ? 'ATTIVO' : 'OFF'}.`, 'info');
   };
@@ -332,10 +295,8 @@ export default function App() {
     const client = clients.find(c => c.id === clientId);
     if (!window.confirm(`Vuoi davvero eliminare l'utente "${client?.user}"?`)) return;
 
-    if (!isDemoMode && user) {
+    if (user) {
       await deleteDoc(doc(db, 'users', user.uid, 'clients', clientId));
-    } else {
-      setClients(prev => prev.filter(c => c.id !== clientId));
     }
     notify(`Utente rimosso.`, 'info');
   };
@@ -357,7 +318,7 @@ export default function App() {
       history: [...(creditData.history || []), newTx]
     };
 
-    if (!isDemoMode && user) {
+    if (user) {
       await setDoc(doc(db, 'users', user.uid, 'profile', 'data'), newCreditData, { merge: true });
     } else {
       setCreditData(newCreditData);
@@ -380,7 +341,7 @@ export default function App() {
       history: [...(creditData.history || []), newTx]
     };
 
-    if (!isDemoMode && user) {
+    if (user) {
       await setDoc(doc(db, 'users', user.uid, 'profile', 'data'), newCreditData, { merge: true });
     } else {
       setCreditData(newCreditData);
@@ -445,7 +406,7 @@ export default function App() {
         }
 
         if (imported.length > 0) {
-          if (!isDemoMode && user) {
+          if (user) {
             for (const item of imported) {
               await addDoc(collection(db, 'users', user.uid, 'clients'), item);
             }
@@ -453,11 +414,6 @@ export default function App() {
               await updateDoc(doc(db, 'users', user.uid, 'profile', 'data'), {
                 creditsBalance: detectedBalance
               });
-            }
-          } else {
-            setClients(imported);
-            if (detectedBalance !== null) {
-              setCreditData(prev => ({ ...prev, creditsBalance: detectedBalance }));
             }
           }
           notify(`Importati con successo ${imported.length} account dal foglio!`, 'success');
@@ -473,6 +429,56 @@ export default function App() {
 
   const activeClientsCount = clients.filter(c => c.isActive).length;
   const monthlyRevenue = clients.filter(c => c.isActive).reduce((sum, c) => sum + (Number(c.monthlyCost) || 0), 0);
+
+  // --- LOGIN GATE: show splash screen when not logged in ---
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-[#080b12] flex items-center justify-center">
+        <div className="text-[#00ff9d] font-mono text-sm animate-pulse">CARICAMENTO...</div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-[#080b12] text-slate-100 flex flex-col items-center justify-center gap-8 font-sans">
+        {/* Logo / Title */}
+        <div className="text-center space-y-2">
+          <div className="flex items-center justify-center gap-3 mb-2">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#00ff9d] to-[#00b8d9] flex items-center justify-center">
+              <span className="text-black font-black text-lg font-mono">P8</span>
+            </div>
+            <h1 className="text-3xl font-black font-mono tracking-tight text-white">
+              PZ8<span className="text-[#00ff9d]">::</span>MANAGER
+            </h1>
+          </div>
+          <p className="text-slate-400 font-mono text-sm">Gestione abbonamenti IPTV</p>
+        </div>
+
+        {/* Login Card */}
+        <div className="bg-[#0d121f] border border-[#1b253b] rounded-2xl p-8 flex flex-col items-center gap-5 w-full max-w-xs shadow-2xl">
+          <p className="text-slate-300 font-mono text-xs text-center leading-relaxed">
+            Accedi con il tuo account Google per visualizzare e gestire i tuoi abbonamenti.
+          </p>
+          <button
+            onClick={handleGoogleLogin}
+            className="w-full flex items-center justify-center gap-3 bg-white hover:bg-slate-100 text-slate-900 font-bold font-mono text-sm py-3 px-6 rounded-xl transition-all shadow-lg hover:shadow-xl"
+          >
+            <svg className="w-5 h-5" viewBox="0 0 24 24">
+              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+            </svg>
+            Accedi con Google
+          </button>
+        </div>
+
+        {/* Footer minimal */}
+        <p className="text-slate-600 font-mono text-xs">pz8-manager.web.app</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#080b12] text-slate-100 flex flex-col font-sans selection:bg-[#00ff9d] selection:text-black">
@@ -511,7 +517,6 @@ export default function App() {
         onOpenSettingsModal={() => setIsSettingsModalOpen(true)}
         onLoginGoogle={handleGoogleLogin}
         onLogout={handleLogout}
-        isDemoMode={isDemoMode}
       />
 
       {/* Main Content */}

@@ -79,6 +79,14 @@ export default function ClientList({
     return true;
   });
 
+  // Sort clients by expiration date ascending (earliest expiring first)
+  const sortedClients = [...filteredClients].sort((a, b) => {
+    if (!a.expirationDate && !b.expirationDate) return 0;
+    if (!a.expirationDate) return 1;
+    if (!b.expirationDate) return -1;
+    return new Date(a.expirationDate).getTime() - new Date(b.expirationDate).getTime();
+  });
+
   return (
     <div className="space-y-4">
       
@@ -140,8 +148,10 @@ export default function ClientList({
 
       {/* Counter */}
       <div className="flex items-center justify-between text-xs font-mono text-slate-400 px-1">
-        <span>Risultati visualizzati: <strong className="text-white">{filteredClients.length}</strong></span>
-        <span>Saldo: <strong className="text-[#00ff9d]">{creditsBalance} CR</strong></span>
+        <span>Risultati visualizzati: <strong className="text-white">{sortedClients.length}</strong></span>
+        {isAdmin && (
+          <span>Saldo: <strong className="text-[#00ff9d]">{creditsBalance} CR</strong></span>
+        )}
       </div>
 
       {/* --- DESKTOP TABLE VIEW --- */}
@@ -166,14 +176,14 @@ export default function ClientList({
             </tr>
           </thead>
           <tbody className="divide-y divide-[#172033]">
-            {filteredClients.length === 0 ? (
+            {sortedClients.length === 0 ? (
               <tr>
                 <td colSpan="7" className="py-8 text-center text-slate-500 font-mono">
                   Nessun utente trovato con i filtri attuali.
                 </td>
               </tr>
             ) : (
-              filteredClients.map((client) => {
+              sortedClients.map((client) => {
                 const daysDiff = getDaysDifference(client.expirationDate);
                 const expired = isExpired(client.expirationDate);
                 const expiring = isExpiringSoon(client.expirationDate, 3);
@@ -343,12 +353,12 @@ export default function ClientList({
 
       {/* --- MOBILE CARD VIEW (<768px) --- */}
       <div className="md:hidden space-y-2.5">
-        {filteredClients.length === 0 ? (
+        {sortedClients.length === 0 ? (
           <div className="py-8 text-center text-slate-500 font-mono text-xs bg-[#0d121f] rounded-xl border border-[#1b253b]">
             Nessun utente trovato.
           </div>
         ) : (
-          filteredClients.map((client) => {
+          sortedClients.map((client) => {
             const daysDiff = getDaysDifference(client.expirationDate);
             const expired = isExpired(client.expirationDate);
             const expiring = isExpiringSoon(client.expirationDate, 3);
