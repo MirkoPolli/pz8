@@ -250,38 +250,43 @@ export default function App() {
       return;
     }
 
-    if (clientToEdit) {
-      // EDIT EXISTING
-      if (user) {
-        await updateDoc(doc(db, 'users', user.uid, 'clients', clientToEdit.id), clientFields);
-      }
-      notify(`Utente "${clientFields.user}" salvato.`, 'success');
-    } else {
-      // CREATE NEW & DEDUCT CREDITS
-      const newClientRecord = {
-        ...clientFields,
-        createdAt: new Date().toISOString(),
-        lastRenewal: null,
-        totalCreditsUsed: deductCredits || 0 // FIX: memorizza i crediti scalati alla creazione!
-      };
+    try {
+      if (clientToEdit && clientToEdit.id) {
+        // EDIT EXISTING
+        if (user) {
+          await updateDoc(doc(db, 'users', user.uid, 'clients', clientToEdit.id), clientFields);
+        }
+        notify(`Utente "${clientFields.user}" salvato.`, 'success');
+      } else {
+        // CREATE NEW & DEDUCT CREDITS
+        const newClientRecord = {
+          ...clientFields,
+          createdAt: new Date().toISOString(),
+          lastRenewal: null,
+          totalCreditsUsed: deductCredits || 0 // FIX: memorizza i crediti scalati alla creazione!
+        };
 
-      if (user) {
-        await addDoc(collection(db, 'users', user.uid, 'clients'), newClientRecord);
+        if (user) {
+          await addDoc(collection(db, 'users', user.uid, 'clients'), newClientRecord);
+        }
+
+        if (deductCredits > 0) {
+          handleDeductCredits(deductCredits, `Nuovo utente "${clientFields.user}" (${deductCredits}M)`);
+        }
+        notify(`Nuovo utente "${clientFields.user}" creato (-${deductCredits} crediti).`, 'success');
       }
 
-      if (deductCredits > 0) {
-        handleDeductCredits(deductCredits, `Nuovo utente "${clientFields.user}" (${deductCredits}M)`);
+      // Salva o aggiorna automaticamente il contatto nella Rubrica
+      if (clientFields.contactName) {
+        handleAutoSaveContact({
+          name: clientFields.contactName,
+          phone: clientFields.phone,
+          telegram: clientFields.telegram
+        });
       }
-      notify(`Nuovo utente "${clientFields.user}" creato (-${deductCredits} crediti).`, 'success');
-    }
-
-    // Salva o aggiorna automaticamente il contatto nella Rubrica
-    if (clientFields.contactName) {
-      handleAutoSaveContact({
-        name: clientFields.contactName,
-        phone: clientFields.phone,
-        telegram: clientFields.telegram
-      });
+    } catch (err) {
+      console.error("Errore salvataggio utente:", err);
+      notify(`Errore durante il salvataggio: ${err.message}`, 'error');
     }
   };
 

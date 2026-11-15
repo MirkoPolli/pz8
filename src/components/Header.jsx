@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Terminal, 
-  Coins, 
   PlusCircle, 
   Settings,
   LogOut, 
@@ -62,23 +61,6 @@ export default function Header({
         {/* Action Controls */}
         <div className="flex items-center gap-2 sm:gap-3 ml-auto">
           
-          {/* Quick Credit Counter Button (Admin only) */}
-          {isAdmin && (
-            <button
-              onClick={onOpenCreditModal}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border font-mono text-xs sm:text-sm font-semibold transition-all ${
-                creditsBalance <= 15 
-                  ? 'bg-[#ff3366]/10 border-[#ff3366] text-[#ff3366] neon-glow-red animate-pulse'
-                  : 'bg-[#00ff9d]/10 border-[#00ff9d]/40 text-[#00ff9d] hover:bg-[#00ff9d]/20'
-              }`}
-              title="Gestione Crediti & Ricarica"
-            >
-              <Coins className="w-4 h-4" />
-              <span>{creditsBalance} CR</span>
-              <span className="hidden sm:inline text-[11px] opacity-80">(+200)</span>
-            </button>
-          )}
-
           {/* New User Button */}
           <button
             onClick={onOpenNewUserModal}

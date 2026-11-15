@@ -24,7 +24,7 @@ export default function UserModal({
   currentCredits,
   contacts = []
 }) {
-  const isEditing = Boolean(clientToEdit);
+  const isEditing = Boolean(clientToEdit && clientToEdit.id);
 
   const [username, setUsername] = useState('');
   const [contactName, setContactName] = useState('');
@@ -87,6 +87,7 @@ export default function UserModal({
   };
 
   const handleSelectContact = (c) => {
+    if (!c) return;
     setContactName(c.name || '');
     setPhone(c.phone || '');
     setTelegram(c.telegram || '');
@@ -94,6 +95,14 @@ export default function UserModal({
       setNotes(c.notes);
     }
     setShowContactDropdown(false);
+  };
+
+  const handleSelectContactById = (contactId) => {
+    if (!contactId) return;
+    const c = contacts.find(item => item.id === contactId);
+    if (c) {
+      handleSelectContact(c);
+    }
   };
 
   const handleTogglePaymentStatus = (status) => {
@@ -156,7 +165,7 @@ export default function UserModal({
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-[#00ff9d]"></span>
             <h2 className="font-mono font-bold text-white text-base">
-              {isEditing ? `Modifica Utente: ${clientToEdit.user}` : 'Aggiungi Nuovo Utente'}
+              {isEditing ? `Modifica Utente: ${clientToEdit?.user || ''}` : 'Aggiungi Nuovo Utente'}
             </h2>
           </div>
           <button 
@@ -195,62 +204,53 @@ export default function UserModal({
             </div>
           </div>
 
-          {/* Contatto Referente con Rubrica Dropdown */}
-          <div className="relative">
-            <div className="flex items-center justify-between mb-1">
-              <label className="text-xs uppercase text-slate-400">
-                Nome Contatto / Referente
+          {/* Contatto Referente con Selettore Rubrica */}
+          <div className="space-y-2 p-3 rounded-xl bg-[#0a0f1c] border border-[#1d2b45]">
+            <div className="flex items-center justify-between">
+              <label className="text-xs uppercase text-slate-300 font-bold flex items-center gap-1.5">
+                <BookUser className="w-3.5 h-3.5 text-[#00ff9d]" />
+                <span>Referente / Rubrica</span>
               </label>
               {contacts.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setShowContactDropdown(!showContactDropdown)}
-                  className="text-[10px] text-[#00ff9d] hover:underline flex items-center gap-1"
-                >
-                  <BookUser className="w-3 h-3" />
-                  <span>{showContactDropdown ? 'Chiudi rubrica' : 'Scegli da Rubrica'}</span>
-                </button>
+                <span className="text-[10px] text-slate-400 font-mono">
+                  {contacts.length} contatti registrati
+                </span>
               )}
             </div>
 
-            <input
-              type="text"
-              value={contactName}
-              onFocus={() => { if (contacts.length > 0) setShowContactDropdown(true); }}
-              onChange={(e) => {
-                setContactName(e.target.value);
-                setShowContactDropdown(true);
-              }}
-              placeholder="es. Mario Rossi (o seleziona da Rubrica)"
-              className="w-full bg-[#0a0d14] border border-[#1f2a45] focus:border-[#00ff9d] rounded-lg px-3 py-2 text-white text-sm outline-none transition-colors"
-            />
-
-            {/* Rubrica suggestion list */}
-            {showContactDropdown && matchingContacts.length > 0 && (
-              <div className="absolute left-0 right-0 top-full mt-1 bg-[#0c1220] border border-[#233559] rounded-xl shadow-2xl z-20 max-h-44 overflow-y-auto divide-y divide-[#172238]">
-                <div className="p-2 text-[10px] text-slate-400 uppercase tracking-wider bg-[#080d17]">
-                  Contatti salvati in rubrica (clicca per compilare tel e telegram):
-                </div>
-                {matchingContacts.map((c) => (
-                  <button
-                    key={c.id}
-                    type="button"
-                    onClick={() => handleSelectContact(c)}
-                    className="w-full text-left p-2.5 hover:bg-[#152038] flex items-center justify-between transition-colors text-xs"
-                  >
-                    <div>
-                      <strong className="text-white">{c.name}</strong>
-                      <div className="text-[11px] text-slate-400">
-                        {c.phone ? `Tel: ${c.phone}` : ''} {c.telegram ? `• TG: ${c.telegram}` : ''}
-                      </div>
-                    </div>
-                    <span className="text-[10px] text-[#00ff9d] px-2 py-0.5 rounded bg-[#00ff9d]/10 border border-[#00ff9d]/20">
-                      Usa
-                    </span>
-                  </button>
-                ))}
+            {/* Menu a tendina Rubrica (se presenti contatti) */}
+            {contacts.length > 0 && (
+              <div>
+                <select
+                  onChange={(e) => handleSelectContactById(e.target.value)}
+                  defaultValue=""
+                  className="w-full bg-[#080c16] border border-[#1e2a42] focus:border-[#00ff9d] text-slate-200 text-xs rounded-lg px-2.5 py-2 outline-none cursor-pointer"
+                >
+                  <option value="" disabled>
+                    -- Scegli da Rubrica (popola tel & telegram) --
+                  </option>
+                  {contacts.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name} {c.phone ? `(${c.phone})` : ''} {c.telegram ? `[TG: ${c.telegram}]` : ''}
+                    </option>
+                  ))}
+                </select>
               </div>
             )}
+
+            {/* Nome Contatto input manuale / modificabile */}
+            <div>
+              <label className="block text-[11px] text-slate-400 mb-1">
+                Nome Contatto:
+              </label>
+              <input
+                type="text"
+                value={contactName}
+                onChange={(e) => setContactName(e.target.value)}
+                placeholder="es. Mario Rossi"
+                className="w-full bg-[#0a0d14] border border-[#1f2a45] focus:border-[#00ff9d] rounded-lg px-3 py-1.5 text-white text-xs outline-none transition-colors"
+              />
+            </div>
           </div>
 
           {/* Telefono / WhatsApp & Telegram */}
