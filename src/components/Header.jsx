@@ -17,8 +17,7 @@ export default function Header({
   onOpenNewUserModal, 
   onOpenSettingsModal,
   onLoginGoogle, 
-  onLogout,
-  isDemoMode
+  onLogout
 }) {
   const [time, setTime] = useState('');
 
@@ -53,9 +52,7 @@ export default function Header({
             <div className="flex items-center gap-2 text-xs font-mono text-slate-400">
               <span className="text-slate-500">{time} CET</span>
               <span>•</span>
-              <span className={isDemoMode ? "text-[#ffb700]" : "text-[#00ff9d]"}>
-                {isDemoMode ? "● DEMO MODE" : "● FIREBASE ONLINE"}
-              </span>
+              <span className="text-[#00ff9d]">● ONLINE</span>
             </div>
           </div>
         </div>

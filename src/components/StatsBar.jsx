@@ -38,8 +38,11 @@ export default function StatsBar({
     return exp < today;
   });
 
-  // Total monthly revenue
-  const monthlyRevenue = activeClients.reduce((sum, c) => sum + (Number(c.monthlyCost) || 0), 0);
+  // Total monthly revenue (net of credit cost: 1 credit = 3€ per active account per month)
+  const creditCostPerMonth = 3; // €3 per credit
+  const monthlyGross = activeClients.reduce((sum, c) => sum + (Number(c.monthlyCost) || 0), 0);
+  const monthlyCreditCost = activeClients.length * creditCostPerMonth;
+  const monthlyRevenue = monthlyGross - monthlyCreditCost;
 
   // Expected credits requirement (3 credits per expiring account)
   const creditsNeededNext3Days = expiringClients.length * 3;
@@ -122,9 +125,12 @@ export default function StatsBar({
         {/* Monthly Revenue */}
         <div className="p-3.5 rounded-xl bg-[#111726] border border-[#1d263b] flex items-center justify-between">
           <div>
-            <div className="text-[11px] font-mono text-slate-400 uppercase tracking-wider">Incasso Mensile</div>
+            <div className="text-[11px] font-mono text-slate-400 uppercase tracking-wider">Incasso Netto/Mese</div>
             <div className="text-xl sm:text-2xl font-mono font-bold text-[#00f0ff] mt-1">
               € {monthlyRevenue.toLocaleString('it-IT', { minimumFractionDigits: 0 })}
+            </div>
+            <div className="text-[10px] font-mono text-slate-500 mt-0.5">
+              lordo €{monthlyGross} − crediti €{monthlyCreditCost}
             </div>
           </div>
           <div className="w-9 h-9 rounded-lg bg-[#00f0ff]/10 border border-[#00f0ff]/30 text-[#00f0ff] flex items-center justify-center">
