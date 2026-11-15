@@ -12,10 +12,15 @@ export default function StatsBar({
   clients, 
   creditsBalance, 
   onFilterExpiring, 
+  onFilterUnpaid,
   onOpenCreditModal,
   isAdmin = true 
 }) {
   const activeClients = clients.filter(c => c.isActive);
+  
+  // Unpaid clients
+  const unpaidClients = clients.filter(c => c.paymentStatus === 'unpaid' && (Number(c.amountDue) > 0));
+  const totalAmountDue = unpaidClients.reduce((sum, c) => sum + (Number(c.amountDue) || 0), 0);
   
   // Clients expiring in <= 3 days (including today)
   const expiringClients = activeClients.filter(c => {
@@ -64,6 +69,24 @@ export default function StatsBar({
             className="px-3 py-1 bg-[#ff3366] text-white font-bold rounded-lg hover:bg-[#ff1a53] transition-all flex-shrink-0 text-xs"
           >
             Ricarica +200 CR
+          </button>
+        </div>
+      )}
+
+      {/* Unpaid Alert Banner (Se ci sono pagamenti in sospeso) */}
+      {totalAmountDue > 0 && (
+        <div className="p-3 rounded-xl bg-[#ff3366]/10 border border-[#ff3366]/30 flex items-center justify-between gap-3 text-xs font-mono text-[#ff6b8b]">
+          <div className="flex items-center gap-2">
+            <Coins className="w-4 h-4 text-[#ff3366] flex-shrink-0" />
+            <span>
+              Hai <strong>€{totalAmountDue}</strong> da riscuotere da <strong>{unpaidClients.length}</strong> {unpaidClients.length === 1 ? 'cliente' : 'clienti'}.
+            </span>
+          </div>
+          <button
+            onClick={onFilterUnpaid}
+            className="px-2.5 py-1 bg-[#ff3366]/20 hover:bg-[#ff3366] hover:text-white border border-[#ff3366]/40 text-white font-bold rounded-lg transition-all text-xs"
+          >
+            Mostra da Saldare →
           </button>
         </div>
       )}

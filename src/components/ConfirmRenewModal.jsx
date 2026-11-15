@@ -1,5 +1,5 @@
-import React from 'react';
-import { AlertCircle, Calendar, Coins, ArrowRight, X } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { AlertCircle, Calendar, Coins, ArrowRight, X, Euro, Check, Clock } from 'lucide-react';
 import { formatDateItalian, addMonthsToDate } from '../utils/dateUtils';
 
 export default function ConfirmRenewModal({
@@ -12,9 +12,23 @@ export default function ConfirmRenewModal({
 }) {
   if (!isOpen || !client) return null;
 
+  const cost = (Number(client.monthlyCost) || 10) * months;
+  const [isPaid, setIsPaid] = useState(true);
+
+  useEffect(() => {
+    setIsPaid(true);
+  }, [isOpen, client]);
+
   const currentExp = client.expirationDate;
   const newExp = addMonthsToDate(currentExp, months);
   const remainingCredits = (creditsBalance || 0) - months;
+
+  const handleConfirmClick = () => {
+    onConfirm({
+      markAsUnpaid: !isPaid,
+      amountToAdd: isPaid ? 0 : cost
+    });
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
@@ -80,7 +94,44 @@ export default function ConfirmRenewModal({
               </div>
             </div>
             <div className="text-right text-[10px] text-slate-500">
-              (Possibilità di annullare in seguito)
+              (Annullabile in seguito)
+            </div>
+          </div>
+
+          {/* Opzione Pagamento Rinnovo */}
+          <div className="p-3 rounded-xl bg-[#0d121f] border border-[#1a243a] space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-slate-300 font-bold">Pagamento Rinnovo (€{cost}):</span>
+              <span className={`text-[11px] font-bold ${isPaid ? 'text-[#00ff9d]' : 'text-[#ff3366]'}`}>
+                {isPaid ? 'Incassato' : 'Da Saldare'}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setIsPaid(true)}
+                className={`py-1.5 px-2 rounded-lg border flex items-center justify-center gap-1.5 transition-all text-xs ${
+                  isPaid 
+                    ? 'bg-[#00ff9d]/20 border-[#00ff9d] text-[#00ff9d] font-bold'
+                    : 'bg-[#080b12] border-[#1b253b] text-slate-400'
+                }`}
+              >
+                <Check className="w-3.5 h-3.5" />
+                <span>Già Incassato</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsPaid(false)}
+                className={`py-1.5 px-2 rounded-lg border flex items-center justify-center gap-1.5 transition-all text-xs ${
+                  !isPaid 
+                    ? 'bg-[#ff3366]/20 border-[#ff3366] text-[#ff3366] font-bold'
+                    : 'bg-[#080b12] border-[#1b253b] text-slate-400'
+                }`}
+              >
+                <Clock className="w-3.5 h-3.5" />
+                <span>Da Saldare (+€{cost})</span>
+              </button>
             </div>
           </div>
 
@@ -95,7 +146,7 @@ export default function ConfirmRenewModal({
             Annulla
           </button>
           <button
-            onClick={onConfirm}
+            onClick={handleConfirmClick}
             className="px-5 py-2 rounded-lg bg-[#00ff9d] hover:bg-[#00dd87] text-black font-bold transition-all shadow-[0_0_15px_rgba(0,255,157,0.3)]"
           >
             Conferma Rinnovo (-{months} CR)

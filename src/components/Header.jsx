@@ -6,7 +6,8 @@ import {
   Settings,
   LogOut, 
   LogIn, 
-  Clock
+  Clock,
+  BookUser
 } from 'lucide-react';
 
 export default function Header({ 
@@ -16,6 +17,7 @@ export default function Header({
   onOpenCreditModal, 
   onOpenNewUserModal, 
   onOpenSettingsModal,
+  onOpenAddressBook,
   onLoginGoogle, 
   onLogout
 }) {
@@ -84,6 +86,16 @@ export default function Header({
           >
             <PlusCircle className="w-4 h-4" />
             <span>Nuovo Utente</span>
+          </button>
+
+          {/* Address Book Modal Button */}
+          <button
+            onClick={onOpenAddressBook}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#151c2e] hover:bg-[#1f2a45] text-slate-300 hover:text-[#00ff9d] border border-[#1f293d] transition-all text-xs font-mono"
+            title="Rubrica Contatti (Gestione referenti e account collegati)"
+          >
+            <BookUser className="w-4 h-4 text-[#00f0ff]" />
+            <span className="hidden md:inline">Rubrica</span>
           </button>
 
           {/* Settings Modal Button */}

@@ -6,6 +6,8 @@ import UserModal from './components/UserModal';
 import CreditModal from './components/CreditModal';
 import ConfirmRenewModal from './components/ConfirmRenewModal';
 import SettingsModal from './components/SettingsModal';
+import AddressBookModal from './components/AddressBookModal';
+import PaymentModal from './components/PaymentModal';
 
 import { 
   auth, 
@@ -23,13 +25,14 @@ import {
   onSnapshot
 } from './firebase';
 
-import { INITIAL_CLIENTS, INITIAL_CREDIT_STATE } from './data/sampleClients';
+import { INITIAL_CREDIT_STATE } from './data/sampleClients';
 import { addMonthsToDate, getTodayDateString } from './utils/dateUtils';
 
 export default function App() {
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [clients, setClients] = useState([]);
+  const [contacts, setContacts] = useState([]);
   const [creditData, setCreditData] = useState({ creditsBalance: 0, creditCostUnit: 3.0, history: [] });
 
   const [filterTab, setFilterTab] = useState('all');
@@ -37,6 +40,14 @@ export default function App() {
   const [clientToEdit, setClientToEdit] = useState(null);
   const [isCreditModalOpen, setIsCreditModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [isAddressBookOpen, setIsAddressBookOpen] = useState(false);
+  
+  // Payment modal state
+  const [paymentModalState, setPaymentModalState] = useState({
+    isOpen: false,
+    client: null
+  });
+
   const [notification, setNotification] = useState(null);
 
   // Admin access control (Mirko Polliotto)
@@ -76,6 +87,7 @@ export default function App() {
       } else {
         setUser(null);
         setClients([]);
+        setContacts([]);
         setCreditData({ creditsBalance: 0, creditCostUnit: 3.0, history: [] });
       }
       setAuthLoading(false);
@@ -94,12 +106,22 @@ export default function App() {
       snapshot.forEach((docSnap) => {
         remoteClients.push({ id: docSnap.id, ...docSnap.data() });
       });
-      if (remoteClients.length > 0) {
-        setClients(remoteClients);
-      }
+      setClients(remoteClients);
     });
 
-    // B. Sync Profile & Credits: /users/{uid}/profile/data
+    // B. Sync Contacts Subcollection: /users/{uid}/contacts
+    const contactsRef = collection(db, 'users', user.uid, 'contacts');
+    const unsubContacts = onSnapshot(contactsRef, (snapshot) => {
+      const remoteContacts = [];
+      snapshot.forEach((docSnap) => {
+        remoteContacts.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      // Sort alphabetically by name
+      remoteContacts.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      setContacts(remoteContacts);
+    });
+
+    // C. Sync Profile & Credits: /users/{uid}/profile/data
     const profileRef = doc(db, 'users', user.uid, 'profile', 'data');
     const unsubProfile = onSnapshot(profileRef, (docSnap) => {
       if (docSnap.exists()) {
@@ -114,7 +136,7 @@ export default function App() {
       }
     });
 
-    // C. Sync Settings & Visible Columns: /users/{uid}/settings/data
+    // D. Sync Settings & Visible Columns: /users/{uid}/settings/data
     const settingsRef = doc(db, 'users', user.uid, 'settings', 'data');
     const unsubSettings = onSnapshot(settingsRef, (docSnap) => {
       if (docSnap.exists() && docSnap.data().visibleColumns) {
@@ -124,6 +146,7 @@ export default function App() {
 
     return () => {
       unsubClients();
+      unsubContacts();
       unsubProfile();
       unsubSettings();
     };
@@ -156,8 +179,66 @@ export default function App() {
     await signOut(auth);
     setUser(null);
     setClients([]);
+    setContacts([]);
     setCreditData({ creditsBalance: 0, creditCostUnit: 3.0, history: [] });
     notify("Disconnesso.", 'info');
+  };
+
+  // Helper auto-save or update contact in Address Book
+  const handleAutoSaveContact = async (contactPayload) => {
+    if (!user || !contactPayload.name) return;
+    const cleanName = contactPayload.name.trim();
+    if (!cleanName) return;
+
+    // Cerca se esiste già un contatto con questo nome (case-insensitive)
+    const existing = contacts.find(c => (c.name || '').trim().toLowerCase() === cleanName.toLowerCase());
+
+    if (existing) {
+      // Aggiorna se sono presenti nuovi dati telefono/telegram
+      const needsUpdate = 
+        (contactPayload.phone && contactPayload.phone !== existing.phone) ||
+        (contactPayload.telegram && contactPayload.telegram !== existing.telegram);
+
+      if (needsUpdate) {
+        await updateDoc(doc(db, 'users', user.uid, 'contacts', existing.id), {
+          phone: contactPayload.phone || existing.phone || '',
+          telegram: contactPayload.telegram || existing.telegram || ''
+        });
+      }
+    } else {
+      // Crea nuovo contatto in rubrica
+      await addDoc(collection(db, 'users', user.uid, 'contacts'), {
+        name: cleanName,
+        phone: contactPayload.phone || '',
+        telegram: contactPayload.telegram || '',
+        notes: '',
+        createdAt: new Date().toISOString()
+      });
+    }
+  };
+
+  // Manual save contact from Address Book Modal
+  const handleSaveContact = async (contactData) => {
+    if (!user) return;
+    const { id, ...fields } = contactData;
+
+    if (id) {
+      await updateDoc(doc(db, 'users', user.uid, 'contacts', id), fields);
+      notify(`Contatto "${fields.name}" aggiornato.`, 'success');
+    } else {
+      await addDoc(collection(db, 'users', user.uid, 'contacts'), {
+        ...fields,
+        createdAt: new Date().toISOString()
+      });
+      notify(`Nuovo contatto "${fields.name}" aggiunto alla rubrica!`, 'success');
+    }
+  };
+
+  // Delete contact from Address Book
+  const handleDeleteContact = async (contactId) => {
+    if (!user) return;
+    await deleteDoc(doc(db, 'users', user.uid, 'contacts', contactId));
+    notify("Contatto rimosso dalla rubrica.", 'info');
   };
 
   // Add / Edit Client
@@ -180,7 +261,8 @@ export default function App() {
       const newClientRecord = {
         ...clientFields,
         createdAt: new Date().toISOString(),
-        lastRenewal: null
+        lastRenewal: null,
+        totalCreditsUsed: deductCredits || 0 // FIX: memorizza i crediti scalati alla creazione!
       };
 
       if (user) {
@@ -191,6 +273,15 @@ export default function App() {
         handleDeductCredits(deductCredits, `Nuovo utente "${clientFields.user}" (${deductCredits}M)`);
       }
       notify(`Nuovo utente "${clientFields.user}" creato (-${deductCredits} crediti).`, 'success');
+    }
+
+    // Salva o aggiorna automaticamente il contatto nella Rubrica
+    if (clientFields.contactName) {
+      handleAutoSaveContact({
+        name: clientFields.contactName,
+        phone: clientFields.phone,
+        telegram: clientFields.telegram
+      });
     }
   };
 
@@ -209,7 +300,7 @@ export default function App() {
   };
 
   // Renewal Flow: 2. Execute Renewal on Confirmation
-  const handleConfirmRenew = async () => {
+  const handleConfirmRenew = async ({ markAsUnpaid, amountToAdd } = {}) => {
     const { client, months } = renewConfirmState;
     if (!client) return;
 
@@ -224,12 +315,19 @@ export default function App() {
       renewedAt: new Date().toISOString()
     };
 
+    const newPaymentStatus = markAsUnpaid ? 'unpaid' : (client.paymentStatus || 'paid');
+    const newAmountDue = markAsUnpaid 
+      ? (Number(client.amountDue) || 0) + amountToAdd 
+      : (client.paymentStatus === 'unpaid' ? (client.amountDue || 0) : 0);
+
     const updatedClient = {
       ...client,
       expirationDate: newExpiration,
       isActive: true,
       totalCreditsUsed: (client.totalCreditsUsed || 0) + months,
-      lastRenewal: renewalRecord
+      lastRenewal: renewalRecord,
+      paymentStatus: newPaymentStatus,
+      amountDue: newAmountDue
     };
 
     if (user) {
@@ -237,13 +335,15 @@ export default function App() {
         expirationDate: newExpiration,
         isActive: true,
         totalCreditsUsed: (client.totalCreditsUsed || 0) + months,
-        lastRenewal: renewalRecord
+        lastRenewal: renewalRecord,
+        paymentStatus: newPaymentStatus,
+        amountDue: newAmountDue
       });
     }
 
     handleDeductCredits(months, `Rinnovo +${months}M per "${client.user}"`);
     notify(
-      `Rinnovato "${client.user}" per +${months} Mesi fino al ${newExpiration} (-${months} crediti)`,
+      `Rinnovato "${client.user}" per +${months} Mesi fino al ${newExpiration} (-${months} crediti)${markAsUnpaid ? ` • Da saldare: €${newAmountDue}` : ''}`,
       'success',
       { label: 'Annulla', onClick: () => handleUndoRenew(updatedClient) }
     );
@@ -276,6 +376,28 @@ export default function App() {
     // Refund credits
     handleAddCredits(months, 0, `Rimborso annullamento rinnovo per "${client.user}" (+${months}M)`);
     notify(`Rinnovo annullato! Data ripristinata e rimborsati +${months} crediti.`, 'info');
+  };
+
+  // Save / Update Payment status
+  const handleSavePayment = async (clientId, paymentData) => {
+    if (!user) return;
+    await updateDoc(doc(db, 'users', user.uid, 'clients', clientId), paymentData);
+    if (paymentData.paymentStatus === 'paid') {
+      notify("Pagamento registrato: tutto saldato!", 'success');
+    } else {
+      notify(`Stato pagamento aggiornato: debito €${paymentData.amountDue}`, 'info');
+    }
+  };
+
+  // Quick Pay (1-click mark as paid)
+  const handleQuickPay = async (client) => {
+    if (!user) return;
+    await updateDoc(doc(db, 'users', user.uid, 'clients', client.id), {
+      paymentStatus: 'paid',
+      amountDue: 0,
+      paymentNote: ''
+    });
+    notify(`Pagamento di €${client.amountDue || 0} per "${client.user}" incassato con successo!`, 'success');
   };
 
   // Toggle Client Active
@@ -346,85 +468,6 @@ export default function App() {
     } else {
       setCreditData(newCreditData);
     }
-  };
-
-  // CSV Import (from Google Sheets)
-  const handleImportCsv = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = async (evt) => {
-      try {
-        const text = evt.target.result;
-        const lines = text.split(/\r?\n/).filter(line => line.trim().length > 0);
-        const imported = [];
-
-        // Check if row 1 has balance & purchased history
-        let detectedBalance = null;
-        if (lines.length > 0) {
-          const row1Cols = lines[0].split(',').map(s => s.trim().replace(/^"|"$/g, ''));
-          // In sheet, G1 is available credits (e.g. 78)
-          const g1 = parseInt(row1Cols[6], 10);
-          if (!isNaN(g1)) {
-            detectedBalance = g1;
-          }
-        }
-
-        for (let i = 1; i < lines.length; i++) {
-          const cols = lines[i].split(',').map(s => s.trim().replace(/^"|"$/g, ''));
-          const username = cols[0];
-          if (!username || username === 'Davide-lan' && cols[1] === 'Contatto') continue;
-
-          const contact = cols[1] || '';
-          const enabled = cols[2] === 'x' || cols[2] === 'X' || cols[2] === 'true';
-          const rawDate = cols[3] || '';
-          const cost = parseFloat(cols[4]) || 10;
-          const creditsUsed = parseInt(cols[5], 10) || 0;
-
-          // Convert DD/MM/YYYY to YYYY-MM-DD
-          let formattedDate = rawDate;
-          if (rawDate.includes('/')) {
-            const parts = rawDate.split('/');
-            if (parts.length === 3) {
-              formattedDate = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
-            }
-          }
-
-          imported.push({
-            id: 'csv_' + i + '_' + Date.now(),
-            user: username,
-            contactName: contact,
-            phone: '',
-            expirationDate: formattedDate || getTodayDateString(),
-            monthlyCost: cost,
-            isActive: enabled,
-            totalCreditsUsed: creditsUsed,
-            notes: 'Importato da Sheet',
-            lastRenewal: null
-          });
-        }
-
-        if (imported.length > 0) {
-          if (user) {
-            for (const item of imported) {
-              await addDoc(collection(db, 'users', user.uid, 'clients'), item);
-            }
-            if (detectedBalance !== null) {
-              await updateDoc(doc(db, 'users', user.uid, 'profile', 'data'), {
-                creditsBalance: detectedBalance
-              });
-            }
-          }
-          notify(`Importati con successo ${imported.length} account dal foglio!`, 'success');
-        }
-      } catch (err) {
-        console.error("CSV import error:", err);
-        notify("Errore durante l'importazione del file CSV", 'error');
-      }
-    };
-    reader.readAsText(file);
-    e.target.value = '';
   };
 
   const activeClientsCount = clients.filter(c => c.isActive).length;
@@ -515,6 +558,7 @@ export default function App() {
           setIsUserModalOpen(true);
         }}
         onOpenSettingsModal={() => setIsSettingsModalOpen(true)}
+        onOpenAddressBook={() => setIsAddressBookOpen(true)}
         onLoginGoogle={handleGoogleLogin}
         onLogout={handleLogout}
       />
@@ -528,6 +572,7 @@ export default function App() {
           creditsBalance={creditData.creditsBalance || 0}
           isAdmin={isAdmin}
           onFilterExpiring={() => setFilterTab('expiring')}
+          onFilterUnpaid={() => setFilterTab('unpaid')}
           onOpenCreditModal={() => setIsCreditModalOpen(true)}
         />
 
@@ -542,12 +587,13 @@ export default function App() {
           }}
           onDelete={handleDeleteClient}
           onToggleActive={handleToggleActive}
-          onImportCsv={handleImportCsv}
           filterTab={filterTab}
           setFilterTab={setFilterTab}
           creditsBalance={creditData.creditsBalance || 0}
           visibleColumns={visibleColumns}
           isAdmin={isAdmin}
+          onQuickPay={handleQuickPay}
+          onOpenPaymentModal={(client) => setPaymentModalState({ isOpen: true, client })}
         />
 
       </main>
@@ -562,6 +608,7 @@ export default function App() {
         onSave={handleSaveClient}
         clientToEdit={clientToEdit}
         currentCredits={creditData.creditsBalance || 0}
+        contacts={contacts}
       />
 
       <CreditModal
@@ -588,6 +635,33 @@ export default function App() {
         client={renewConfirmState.client}
         months={renewConfirmState.months}
         creditsBalance={creditData.creditsBalance || 0}
+      />
+
+      {/* Address Book Modal */}
+      <AddressBookModal
+        isOpen={isAddressBookOpen}
+        onClose={() => setIsAddressBookOpen(false)}
+        contacts={contacts}
+        clients={clients}
+        onSaveContact={handleSaveContact}
+        onDeleteContact={handleDeleteContact}
+        onSelectContactForNewUser={(contact) => {
+          setClientToEdit({
+            contactName: contact.name,
+            phone: contact.phone,
+            telegram: contact.telegram,
+            notes: contact.notes
+          });
+          setIsUserModalOpen(true);
+        }}
+      />
+
+      {/* Payment Modal */}
+      <PaymentModal
+        isOpen={paymentModalState.isOpen}
+        onClose={() => setPaymentModalState({ isOpen: false, client: null })}
+        client={paymentModalState.client}
+        onSavePayment={handleSavePayment}
       />
 
     </div>
