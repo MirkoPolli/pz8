@@ -6,8 +6,10 @@ import {
   LogOut, 
   LogIn, 
   Clock,
-  BookUser
+  BookUser,
+  RotateCw
 } from 'lucide-react';
+import { forceReloadApp } from '../utils/reloadApp';
 
 export default function Header({ 
   user, 
@@ -21,6 +23,12 @@ export default function Header({
   onLogout
 }) {
   const [time, setTime] = useState('');
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await forceReloadApp();
+  };
 
   useEffect(() => {
     const update = () => {
@@ -78,6 +86,15 @@ export default function Header({
           >
             <BookUser className="w-4 h-4 text-[#00f0ff]" />
             <span className="hidden md:inline">Rubrica</span>
+          </button>
+
+          {/* Refresh App / Cache Buster Button (Ideale per iPhone / Safari) */}
+          <button
+            onClick={handleRefresh}
+            className="p-2 rounded-lg bg-[#151c2e] hover:bg-[#1f2a45] text-slate-300 hover:text-[#00ff9d] border border-[#1f293d] transition-all"
+            title="Aggiorna / Ricarica App (svuota cache smartphone e carica l'ultima versione)"
+          >
+            <RotateCw className={`w-4 h-4 text-[#00ff9d] ${isRefreshing ? 'animate-spin' : ''}`} />
           </button>
 
           {/* Settings Modal Button */}

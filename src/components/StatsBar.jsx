@@ -14,7 +14,8 @@ export default function StatsBar({
   onFilterExpiring, 
   onFilterUnpaid,
   onOpenCreditModal,
-  isAdmin = true 
+  isAdmin = true,
+  tokenCost = 3
 }) {
   const activeClients = clients.filter(c => c.isActive);
   
@@ -43,8 +44,8 @@ export default function StatsBar({
     return exp < today;
   });
 
-  // Total monthly revenue (net of credit cost: 1 credit = 3€ per active account per month)
-  const creditCostPerMonth = 3; // €3 per credit
+  // Total monthly revenue (net of configurable token cost, e.g. 3€ or 5€)
+  const creditCostPerMonth = Number(tokenCost) || 3;
   const monthlyGross = activeClients.reduce((sum, c) => sum + (Number(c.monthlyCost) || 0), 0);
   const monthlyCreditCost = activeClients.length * creditCostPerMonth;
   const monthlyRevenue = monthlyGross - monthlyCreditCost;
@@ -153,7 +154,7 @@ export default function StatsBar({
               € {monthlyRevenue.toLocaleString('it-IT', { minimumFractionDigits: 0 })}
             </div>
             <div className="text-[10px] font-mono text-slate-500 mt-0.5">
-              lordo €{monthlyGross} − crediti €{monthlyCreditCost}
+              lordo €{monthlyGross} − crediti €{monthlyCreditCost} ({creditCostPerMonth}€/credito)
             </div>
           </div>
           <div className="w-9 h-9 rounded-lg bg-[#00f0ff]/10 border border-[#00f0ff]/30 text-[#00f0ff] flex items-center justify-center">

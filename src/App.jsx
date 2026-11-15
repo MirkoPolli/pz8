@@ -65,6 +65,12 @@ export default function App() {
     };
   });
 
+  // Token / Credit purchase cost unit (individual per user, e.g. 3€ for Mirko, 5€ for friend)
+  const [tokenCost, setTokenCost] = useState(() => {
+    const saved = localStorage.getItem('pz8_token_cost');
+    return saved !== null ? Number(saved) : 3;
+  });
+
   // Renewal Confirmation state
   const [renewConfirmState, setRenewConfirmState] = useState({
     isOpen: false,
@@ -139,8 +145,15 @@ export default function App() {
     // D. Sync Settings & Visible Columns: /users/{uid}/settings/data
     const settingsRef = doc(db, 'users', user.uid, 'settings', 'data');
     const unsubSettings = onSnapshot(settingsRef, (docSnap) => {
-      if (docSnap.exists() && docSnap.data().visibleColumns) {
-        setVisibleColumns(docSnap.data().visibleColumns);
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (data.visibleColumns) {
+          setVisibleColumns(data.visibleColumns);
+        }
+        if (data.tokenCost !== undefined) {
+          setTokenCost(Number(data.tokenCost));
+          localStorage.setItem('pz8_token_cost', data.tokenCost);
+        }
       }
     });
 
@@ -163,6 +176,17 @@ export default function App() {
     } else {
       localStorage.setItem('pz8_visible_columns', JSON.stringify(updated));
     }
+  };
+
+  const handleChangeTokenCost = async (newCost) => {
+    const val = Number(newCost);
+    if (isNaN(val) || val < 0) return;
+    setTokenCost(val);
+    localStorage.setItem('pz8_token_cost', val);
+    if (user) {
+      await setDoc(doc(db, 'users', user.uid, 'settings', 'data'), { tokenCost: val }, { merge: true });
+    }
+    notify(`Costo credito aggiornato a €${val}`, 'success');
   };
 
   // Auth Handlers
@@ -576,6 +600,7 @@ export default function App() {
           clients={clients}
           creditsBalance={creditData.creditsBalance || 0}
           isAdmin={isAdmin}
+          tokenCost={tokenCost}
           onFilterExpiring={() => setFilterTab('expiring')}
           onFilterUnpaid={() => setFilterTab('unpaid')}
           onOpenCreditModal={() => setIsCreditModalOpen(true)}
@@ -630,6 +655,8 @@ export default function App() {
         onClose={() => setIsSettingsModalOpen(false)}
         visibleColumns={visibleColumns}
         onToggleColumn={handleToggleColumn}
+        tokenCost={tokenCost}
+        onChangeTokenCost={handleChangeTokenCost}
         user={user}
       />
 
