@@ -82,6 +82,13 @@ export default function SettingsModal({
       visible: visibleColumns.monthlyCost ?? true
     },
     {
+      id: 'payment',
+      label: 'Stato Pagamento',
+      description: 'Mostra colonna per debiti e incassi (In Regola / Da Saldare)',
+      isMandatory: false,
+      visible: visibleColumns.payment ?? true
+    },
+    {
       id: 'notes',
       label: 'Note Aggiuntive',
       description: 'Promemoria, dettagli accordo o dispositivi collegati',
@@ -155,13 +162,13 @@ export default function SettingsModal({
                   key={cost}
                   type="button"
                   onClick={() => handleSaveCost(cost)}
-                  className={`px-3 py-1.5 rounded-lg border font-bold transition-all ${
+                  className={`px-3.5 py-1.5 rounded-lg border font-bold transition-all ${
                     Number(tokenCost) === cost
                       ? 'bg-[#00ff9d] text-black border-[#00ff9d] shadow-[0_0_10px_rgba(0,255,157,0.3)]'
                       : 'bg-[#121a2c] text-slate-300 border-[#1f2d4d] hover:bg-[#1a263f] hover:text-white'
                   }`}
                 >
-                  €{cost} {cost === 3 ? '(Mirko)' : cost === 5 ? '(Amico)' : ''}
+                  €{cost}
                 </button>
               ))}
 

@@ -131,7 +131,7 @@ export default function PaymentModal({
             <div className="space-y-3 p-3.5 rounded-xl bg-[#140b12] border border-[#ff3366]/30 animate-in fade-in">
               <div>
                 <label className="text-slate-300 block mb-1 text-[11px]">
-                  Importo da Saldate (€):
+                  Importo da Saldare (€):
                 </label>
                 <div className="relative">
                   <Euro className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
@@ -141,22 +141,29 @@ export default function PaymentModal({
                     step="1"
                     value={amountDue}
                     onChange={(e) => setAmountDue(e.target.value)}
-                    placeholder="Es. 30"
+                    placeholder="Es. 10"
                     className="w-full bg-[#080b12] border border-[#2a1723] focus:border-[#ff3366] rounded-lg pl-9 pr-3 py-2 text-white font-mono text-sm outline-none"
                     required
                   />
                 </div>
               </div>
 
-              {/* Quick suggestions */}
-              <div className="flex items-center gap-1.5">
+              {/* Quick suggestions: 5, 10, 15, 20, 30 */}
+              <div className="flex items-center gap-1.5 flex-wrap">
                 <span className="text-[10px] text-slate-500">Rapidi:</span>
-                {[10, 20, 30, 60, 100, 120].map((amt) => (
+                {[5, 10, 15, 20, 30].map((amt) => (
                   <button
                     key={amt}
                     type="button"
-                    onClick={() => setAmountDue(amt)}
-                    className="px-2 py-0.5 rounded bg-[#1e101d] text-[#ff80a0] border border-[#ff3366]/30 text-[10px] hover:bg-[#ff3366]/20"
+                    onClick={() => {
+                      setAmountDue(amt);
+                      setPaymentStatus('unpaid');
+                    }}
+                    className={`px-2.5 py-1 rounded border text-xs font-bold transition-all ${
+                      Number(amountDue) === amt && paymentStatus === 'unpaid'
+                        ? 'bg-[#ff3366] text-white border-[#ff3366]'
+                        : 'bg-[#1e101d] text-[#ff80a0] border-[#ff3366]/30 hover:bg-[#ff3366]/20'
+                    }`}
                   >
                     €{amt}
                   </button>

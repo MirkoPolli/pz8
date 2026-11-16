@@ -321,18 +321,6 @@ export default function AddressBookModal({
 
                     {/* Actions */}
                     <div className="flex items-center gap-1">
-                      {onSelectContactForNewUser && (
-                        <button
-                          onClick={() => {
-                            onSelectContactForNewUser(contact);
-                            onClose();
-                          }}
-                          className="px-2 py-1 rounded bg-[#00ff9d]/15 text-[#00ff9d] border border-[#00ff9d]/40 hover:bg-[#00ff9d] hover:text-black font-bold text-[10px] transition-all"
-                          title="Crea nuovo account con questo contatto"
-                        >
-                          + Assegna Account
-                        </button>
-                      )}
                       <button
                         onClick={() => handleStartEdit(contact)}
                         className="p-1.5 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"

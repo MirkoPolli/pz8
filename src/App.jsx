@@ -8,6 +8,7 @@ import ConfirmRenewModal from './components/ConfirmRenewModal';
 import SettingsModal from './components/SettingsModal';
 import AddressBookModal from './components/AddressBookModal';
 import PaymentModal from './components/PaymentModal';
+import ConfirmDeleteModal from './components/ConfirmDeleteModal';
 
 import { 
   auth, 
@@ -48,6 +49,12 @@ export default function App() {
     client: null
   });
 
+  // Delete modal state
+  const [deleteModalState, setDeleteModalState] = useState({
+    isOpen: false,
+    client: null
+  });
+
   const [notification, setNotification] = useState(null);
 
   // Admin access control (Mirko Polliotto)
@@ -60,6 +67,7 @@ export default function App() {
     return saved ? JSON.parse(saved) : {
       contactName: true,
       monthlyCost: true,
+      payment: true,
       notes: true,
       totalCreditsUsed: false
     };
@@ -110,7 +118,8 @@ export default function App() {
     const unsubClients = onSnapshot(clientsRef, (snapshot) => {
       const remoteClients = [];
       snapshot.forEach((docSnap) => {
-        remoteClients.push({ id: docSnap.id, ...docSnap.data() });
+        // Garantisce che l'ID del documento Firestore reale non venga sovrascritto
+        remoteClients.push({ ...docSnap.data(), id: docSnap.id });
       });
       setClients(remoteClients);
     });
@@ -120,7 +129,8 @@ export default function App() {
     const unsubContacts = onSnapshot(contactsRef, (snapshot) => {
       const remoteContacts = [];
       snapshot.forEach((docSnap) => {
-        remoteContacts.push({ id: docSnap.id, ...docSnap.data() });
+        // Garantisce che l'ID del documento Firestore reale non venga sovrascritto
+        remoteContacts.push({ ...docSnap.data(), id: docSnap.id });
       });
       // Sort alphabetically by name
       remoteContacts.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
@@ -443,13 +453,15 @@ export default function App() {
 
   // Delete Client
   const handleDeleteClient = async (clientId) => {
-    const client = clients.find(c => c.id === clientId);
-    if (!window.confirm(`Vuoi davvero eliminare l'utente "${client?.user}"?`)) return;
-
-    if (user) {
-      await deleteDoc(doc(db, 'users', user.uid, 'clients', clientId));
+    try {
+      if (user) {
+        await deleteDoc(doc(db, 'users', user.uid, 'clients', clientId));
+      }
+      notify("Utente rimosso con successo.", 'info');
+    } catch (err) {
+      console.error("Errore cancellazione:", err);
+      notify(`Errore cancellazione: ${err.message}`, 'error');
     }
-    notify(`Utente rimosso.`, 'info');
   };
 
   // Credits Management
@@ -615,7 +627,12 @@ export default function App() {
             setClientToEdit(client);
             setIsUserModalOpen(true);
           }}
-          onDelete={handleDeleteClient}
+          onDelete={(clientId) => {
+            const c = clients.find(x => x.id === clientId);
+            if (c) {
+              setDeleteModalState({ isOpen: true, client: c });
+            }
+          }}
           onToggleActive={handleToggleActive}
           filterTab={filterTab}
           setFilterTab={setFilterTab}
@@ -694,6 +711,14 @@ export default function App() {
         onClose={() => setPaymentModalState({ isOpen: false, client: null })}
         client={paymentModalState.client}
         onSavePayment={handleSavePayment}
+      />
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmDeleteModal
+        isOpen={deleteModalState.isOpen}
+        onClose={() => setDeleteModalState({ isOpen: false, client: null })}
+        onConfirm={handleDeleteClient}
+        client={deleteModalState.client}
       />
 
     </div>

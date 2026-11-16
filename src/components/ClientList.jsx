@@ -187,11 +187,13 @@ export default function ClientList({
               {visibleColumns.monthlyCost !== false && (
                 <th className="py-3 px-4">Costo</th>
               )}
-              <th className="py-3 px-4">Pagamento</th>
+              {visibleColumns.payment !== false && (
+                <th className="py-3 px-4">Pagamento</th>
+              )}
               {visibleColumns.totalCreditsUsed && (
                 <th className="py-3 px-4">Tot. Crediti</th>
               )}
-              <th className="py-3 px-4 text-center">Rinnova (Conferma)</th>
+              <th className="py-3 px-4 text-center">Rinnova</th>
               <th className="py-3 px-4 text-right">Azioni</th>
             </tr>
           </thead>
@@ -291,7 +293,13 @@ export default function ClientList({
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-1.5">
                         <span className={`font-bold ${
-                          expired ? 'text-[#ff3366]' : expiring ? 'text-[#ffb700]' : 'text-slate-200'
+                          expired 
+                            ? 'text-[#ff3366]' 
+                            : daysDiff === 0 
+                            ? 'text-[#ff5500] font-black' 
+                            : expiring 
+                            ? 'text-[#ffb700]' 
+                            : 'text-slate-200'
                         }`}>
                           {formatDateItalian(client.expirationDate)}
                         </span>
@@ -301,9 +309,14 @@ export default function ClientList({
                             Scaduto ({Math.abs(daysDiff)}gg fa)
                           </span>
                         )}
-                        {!expired && expiring && (
+                        {!expired && daysDiff === 0 && (
+                          <span className="px-2 py-0.5 rounded bg-[#ff5500]/25 text-[#ff6600] font-black text-[10px] border border-[#ff5500] animate-pulse shadow-[0_0_8px_rgba(255,85,0,0.35)]">
+                            SCADE OGGI
+                          </span>
+                        )}
+                        {!expired && expiring && daysDiff > 0 && (
                           <span className="px-1.5 py-0.2 rounded bg-[#ffb700]/15 text-[#ffb700] text-[10px] border border-[#ffb700]/30 animate-pulse">
-                            {daysDiff === 0 ? 'OGGI' : `tra ${daysDiff}gg`}
+                            tra {daysDiff}gg
                           </span>
                         )}
                       </div>
@@ -317,34 +330,36 @@ export default function ClientList({
                     )}
 
                     {/* Sezione Pagamento */}
-                    <td className="py-3 px-4">
-                      {isUnpaid ? (
-                        <div className="flex items-center gap-1.5">
+                    {visibleColumns.payment !== false && (
+                      <td className="py-3 px-4">
+                        {isUnpaid ? (
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              onClick={() => onOpenPaymentModal(client)}
+                              className="px-2 py-0.5 rounded bg-[#ff3366]/20 hover:bg-[#ff3366]/30 border border-[#ff3366]/50 text-[#ff3366] font-bold text-[10px] flex items-center gap-1"
+                              title={client.paymentNote ? `Nota: ${client.paymentNote}` : 'Clicca per gestire debito'}
+                            >
+                              <span>DA SALDARE: €{client.amountDue}</span>
+                            </button>
+                            <button
+                              onClick={() => onQuickPay(client)}
+                              className="p-1 rounded bg-[#00ff9d]/20 hover:bg-[#00ff9d] hover:text-black text-[#00ff9d] border border-[#00ff9d]/40 text-[10px] transition-all"
+                              title="Segna subito come saldato"
+                            >
+                              <Check className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ) : (
                           <button
                             onClick={() => onOpenPaymentModal(client)}
-                            className="px-2 py-0.5 rounded bg-[#ff3366]/20 hover:bg-[#ff3366]/30 border border-[#ff3366]/50 text-[#ff3366] font-bold text-[10px] flex items-center gap-1"
-                            title={client.paymentNote ? `Nota: ${client.paymentNote}` : 'Clicca per gestire debito'}
+                            className="px-1.5 py-0.5 rounded text-slate-500 hover:text-[#00ff9d] hover:bg-[#00ff9d]/10 text-[10px] transition-colors"
+                            title="Stato regolare. Clicca per segnare un debito"
                           >
-                            <span>DA SALDARE: €{client.amountDue}</span>
+                            <span className="text-[#00ff9d]/80 font-mono">✓ Pagato</span>
                           </button>
-                          <button
-                            onClick={() => onQuickPay(client)}
-                            className="p-1 rounded bg-[#00ff9d]/20 hover:bg-[#00ff9d] hover:text-black text-[#00ff9d] border border-[#00ff9d]/40 text-[10px] transition-all"
-                            title="Segna subito come saldato"
-                          >
-                            <Check className="w-3 h-3" />
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => onOpenPaymentModal(client)}
-                          className="px-1.5 py-0.5 rounded text-slate-500 hover:text-[#00ff9d] hover:bg-[#00ff9d]/10 text-[10px] transition-colors"
-                          title="Stato regolare. Clicca per segnare un debito"
-                        >
-                          <span className="text-[#00ff9d]/80 font-mono">✓ Pagato</span>
-                        </button>
-                      )}
-                    </td>
+                        )}
+                      </td>
+                    )}
 
                     {/* Total Credits Used */}
                     {visibleColumns.totalCreditsUsed && (
@@ -353,29 +368,29 @@ export default function ClientList({
                       </td>
                     )}
 
-                    {/* Renewal Buttons with Confirmation */}
+                    {/* Renewal Buttons */}
                     <td className="py-3 px-4">
-                      <div className="flex items-center justify-center gap-1">
+                      <div className="flex items-center justify-center gap-1.5">
                         <button
                           onClick={() => onRequestRenew(client, 1)}
-                          className="px-2 py-1 rounded bg-[#162035] hover:bg-[#00ff9d] hover:text-black border border-[#1f2d4d] text-slate-300 text-[11px] font-bold transition-all"
+                          className="px-2.5 py-1 rounded bg-[#162035] hover:bg-[#00ff9d] hover:text-black border border-[#1f2d4d] text-slate-300 text-xs font-bold transition-all"
                           title="Rinnova +1 Mese"
                         >
-                          +1M <span className="opacity-70 text-[9px]">(-1c)</span>
+                          +1M
                         </button>
                         <button
                           onClick={() => onRequestRenew(client, 3)}
-                          className="px-2.5 py-1 rounded bg-[#182642] hover:bg-[#00f0ff] hover:text-black border border-[#00f0ff]/40 text-[#00f0ff] text-[11px] font-bold transition-all shadow-[0_0_8px_rgba(0,240,255,0.15)]"
+                          className="px-3 py-1 rounded bg-[#182642] hover:bg-[#00f0ff] hover:text-black border border-[#00f0ff]/40 text-[#00f0ff] text-xs font-bold transition-all shadow-[0_0_8px_rgba(0,240,255,0.15)]"
                           title="Rinnova +3 Mesi"
                         >
-                          +3M <span className="opacity-70 text-[9px]">(-3c)</span>
+                          +3M
                         </button>
                         <button
                           onClick={() => onRequestRenew(client, 12)}
-                          className="px-2 py-1 rounded bg-[#162035] hover:bg-[#ffb700] hover:text-black border border-[#1f2d4d] text-slate-300 text-[11px] font-bold transition-all"
+                          className="px-2.5 py-1 rounded bg-[#162035] hover:bg-[#ffb700] hover:text-black border border-[#1f2d4d] text-slate-300 text-xs font-bold transition-all"
                           title="Rinnova +12 Mesi"
                         >
-                          +12M <span className="opacity-70 text-[9px]">(-12c)</span>
+                          +12M
                         </button>
 
                         {/* Undo Renewal Button */}
@@ -443,6 +458,8 @@ export default function ClientList({
                     ? 'border-[#ff3366]/50 bg-[#160b13]'
                     : expired 
                     ? 'border-[#ff3366]/50 bg-[#140b12]' 
+                    : daysDiff === 0
+                    ? 'border-[#ff5500] bg-[#1a0e08] shadow-[0_0_12px_rgba(255,85,0,0.2)]'
                     : expiring 
                     ? 'border-[#ffb700]/50 bg-[#16120b]' 
                     : 'border-[#1b253b]'
@@ -503,14 +520,25 @@ export default function ClientList({
                   <div>
                     <span className="text-slate-500 text-[10px] block uppercase">Scadenza</span>
                     <span className={`font-bold ${
-                      expired ? 'text-[#ff3366]' : expiring ? 'text-[#ffb700]' : 'text-slate-200'
+                      expired 
+                        ? 'text-[#ff3366]' 
+                        : daysDiff === 0 
+                        ? 'text-[#ff5500] font-black' 
+                        : expiring 
+                        ? 'text-[#ffb700]' 
+                        : 'text-slate-200'
                     }`}>
                       {formatDateItalian(client.expirationDate)}
                     </span>
                     {expired && <span className="text-[#ff3366] text-[10px] ml-1">(Scaduto)</span>}
-                    {!expired && expiring && (
+                    {!expired && daysDiff === 0 && (
+                      <span className="px-1.5 py-0.5 rounded bg-[#ff5500]/25 text-[#ff6600] font-black text-[10px] border border-[#ff5500] ml-1.5 animate-pulse">
+                        SCADE OGGI
+                      </span>
+                    )}
+                    {!expired && expiring && daysDiff > 0 && (
                       <span className="text-[#ffb700] text-[10px] ml-1">
-                        ({daysDiff === 0 ? 'Oggi' : `tra ${daysDiff}gg`})
+                        (tra {daysDiff}gg)
                       </span>
                     )}
                   </div>
@@ -531,33 +559,35 @@ export default function ClientList({
                 </div>
 
                 {/* Sezione Pagamento Mobile */}
-                <div className="flex items-center justify-between p-2 rounded-lg bg-[#0a0f1c] border border-[#19253d]">
-                  <span className="text-[10px] text-slate-400 uppercase">Stato Pagamento:</span>
-                  {isUnpaid ? (
-                    <div className="flex items-center gap-2">
+                {visibleColumns.payment !== false && (
+                  <div className="flex items-center justify-between p-2 rounded-lg bg-[#0a0f1c] border border-[#19253d]">
+                    <span className="text-[10px] text-slate-400 uppercase">Stato Pagamento:</span>
+                    {isUnpaid ? (
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => onOpenPaymentModal(client)}
+                          className="px-2 py-0.5 rounded bg-[#ff3366]/20 border border-[#ff3366]/50 text-[#ff3366] font-bold text-[11px]"
+                        >
+                          DA SALDARE: €{client.amountDue}
+                        </button>
+                        <button
+                          onClick={() => onQuickPay(client)}
+                          className="p-1 rounded bg-[#00ff9d] text-black font-bold text-[10px]"
+                          title="Segna come saldato"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ) : (
                       <button
                         onClick={() => onOpenPaymentModal(client)}
-                        className="px-2 py-0.5 rounded bg-[#ff3366]/20 border border-[#ff3366]/50 text-[#ff3366] font-bold text-[11px]"
+                        className="text-[#00ff9d] text-[11px] font-bold"
                       >
-                        DA SALDARE: €{client.amountDue}
+                        ✓ In Regola
                       </button>
-                      <button
-                        onClick={() => onQuickPay(client)}
-                        className="p-1 rounded bg-[#00ff9d] text-black font-bold text-[10px]"
-                        title="Segna come saldato"
-                      >
-                        <Check className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => onOpenPaymentModal(client)}
-                      className="text-[#00ff9d] text-[11px] font-bold"
-                    >
-                      ✓ In Regola
-                    </button>
-                  )}
-                </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Renewal row with Undo */}
                 <div className="space-y-1.5 pt-1 border-t border-[#162033]">
@@ -578,21 +608,21 @@ export default function ClientList({
                   <div className="grid grid-cols-3 gap-1.5">
                     <button
                       onClick={() => onRequestRenew(client, 1)}
-                      className="py-1.5 rounded-lg bg-[#162035] hover:bg-[#00ff9d] hover:text-black border border-[#1f2d4d] text-slate-300 font-bold text-center"
+                      className="py-1.5 rounded-lg bg-[#162035] hover:bg-[#00ff9d] hover:text-black border border-[#1f2d4d] text-slate-300 font-bold text-center text-xs"
                     >
-                      +1 Mese <span className="text-[9px] block opacity-75">(-1 CR)</span>
+                      +1M
                     </button>
                     <button
                       onClick={() => onRequestRenew(client, 3)}
-                      className="py-1.5 rounded-lg bg-[#182642] hover:bg-[#00f0ff] hover:text-black border border-[#00f0ff]/40 text-[#00f0ff] font-bold text-center"
+                      className="py-1.5 rounded-lg bg-[#182642] hover:bg-[#00f0ff] hover:text-black border border-[#00f0ff]/40 text-[#00f0ff] font-bold text-center text-xs"
                     >
-                      +3 Mesi <span className="text-[9px] block opacity-75">(-3 CR)</span>
+                      +3M
                     </button>
                     <button
                       onClick={() => onRequestRenew(client, 12)}
-                      className="py-1.5 rounded-lg bg-[#162035] hover:bg-[#ffb700] hover:text-black border border-[#1f2d4d] text-slate-300 font-bold text-center"
+                      className="py-1.5 rounded-lg bg-[#162035] hover:bg-[#ffb700] hover:text-black border border-[#1f2d4d] text-slate-300 font-bold text-center text-xs"
                     >
-                      +12 Mesi <span className="text-[9px] block opacity-75">(-12 CR)</span>
+                      +12M
                     </button>
                   </div>
                 </div>
