@@ -13,9 +13,10 @@ import {
   BookUser,
   Clock,
   Check,
-  Search
+  Search,
+  RotateCcw
 } from 'lucide-react';
-import { getTodayDateString, addMonthsToDate } from '../utils/dateUtils';
+import { getTodayDateString, addMonthsToDate, formatDateItalian } from '../utils/dateUtils';
 
 export default function UserModal({ 
   isOpen, 
@@ -23,7 +24,8 @@ export default function UserModal({
   onSave, 
   clientToEdit, 
   currentCredits,
-  contacts = []
+  contacts = [],
+  onUndoRenew
 }) {
   const isEditing = Boolean(clientToEdit && clientToEdit.id);
 
@@ -196,6 +198,37 @@ export default function UserModal({
             <div className="p-3 rounded-lg bg-[#ff3366]/10 border border-[#ff3366]/40 text-[#ff3366] text-xs flex items-center gap-2">
               <AlertCircle className="w-4 h-4 flex-shrink-0" />
               <span>{error}</span>
+            </div>
+          )}
+
+          {/* Banner Annulla Ultimo Rinnovo (se presente rinnovo recente) */}
+          {isEditing && clientToEdit?.lastRenewal && onUndoRenew && (
+            <div className="p-3.5 rounded-xl bg-[#ffb700]/10 border border-[#ffb700]/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-[0_0_15px_rgba(255,183,0,0.1)]">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-[#ffb700]/20 text-[#ffb700] flex items-center justify-center flex-shrink-0">
+                  <RotateCcw className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="text-white font-bold text-xs">
+                    Ultimo rinnovo: +{clientToEdit.lastRenewal.months} {clientToEdit.lastRenewal.months === 1 ? 'Mese' : 'Mesi'}
+                  </div>
+                  <div className="text-[11px] text-slate-400">
+                    Scadenza prec.: {formatDateItalian(clientToEdit.lastRenewal.prevExpirationDate)} • Vengono rimborsati +{clientToEdit.lastRenewal.months} CR
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  onUndoRenew(clientToEdit);
+                  onClose();
+                }}
+                className="px-3 py-1.5 rounded-lg bg-[#ffb700] hover:bg-[#ffa600] text-black font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-[0_0_10px_rgba(255,183,0,0.3)] flex-shrink-0"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Annulla Rinnovo</span>
+              </button>
             </div>
           )}
 

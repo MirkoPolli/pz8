@@ -536,18 +536,6 @@ export default function ClientList({
                         >
                           +12M
                         </button>
-
-                        {/* Undo Renewal Button */}
-                        {client.lastRenewal && (
-                          <button
-                            onClick={() => onUndoRenew(client)}
-                            className="px-2 py-1 rounded bg-[#ffb700]/15 hover:bg-[#ffb700] hover:text-black border border-[#ffb700]/40 text-[#ffb700] text-[10px] font-bold transition-all flex items-center gap-1 ml-1"
-                            title={`Annulla ultimo rinnovo (+${client.lastRenewal.months}M) e rimborsa i crediti`}
-                          >
-                            <RotateCcw className="w-3 h-3" />
-                            <span>Annulla</span>
-                          </button>
-                        )}
                       </div>
                     </td>
 
@@ -733,20 +721,10 @@ export default function ClientList({
                   </div>
                 )}
 
-                {/* Renewal row with Undo */}
+                {/* Renewal row */}
                 <div className="space-y-1.5 pt-1 border-t border-[#162033]">
                   <div className="flex items-center justify-between">
                     <span className="text-slate-400 text-[10px] uppercase font-bold">Rinnova:</span>
-                    {client.lastRenewal && (
-                      <button
-                        onClick={() => onUndoRenew(client)}
-                        className="px-2 py-0.5 rounded bg-[#ffb700]/15 hover:bg-[#ffb700] hover:text-black border border-[#ffb700]/40 text-[#ffb700] text-[10px] font-bold flex items-center gap-1"
-                        title="Annulla rinnovo precedente"
-                      >
-                        <RotateCcw className="w-3 h-3" />
-                        <span>Annulla +{client.lastRenewal.months}M</span>
-                      </button>
-                    )}
                   </div>
 
                   <div className="grid grid-cols-3 gap-1.5">

@@ -686,6 +686,7 @@ export default function App() {
         clientToEdit={clientToEdit}
         currentCredits={creditData.creditsBalance || 0}
         contacts={contacts}
+        onUndoRenew={handleUndoRenew}
       />
 
       <CreditModal
