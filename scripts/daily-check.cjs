@@ -51,27 +51,43 @@ async function run() {
   console.log('=== Controllo Scadenze Giornaliero ===');
   console.log('Data Oggi:', todayStr, '| Data Domani:', tomorrowStr);
 
-  // Recupera tutti gli utenti presenti in Firestore
-  const usersSnap = await db.collection('users').get();
-  console.log(`Trovati ${usersSnap.size} utenti nel sistema.`);
+  // Recupera tutti gli utenti tramite Firebase Auth (include sempre tutti gli utenti registrati)
+  const userMap = new Map();
+  try {
+    const listUsersResult = await admin.auth().listUsers(1000);
+    console.log(`Trovati ${listUsersResult.users.length} utenti su Firebase Auth.`);
+    listUsersResult.users.forEach(u => {
+      if (u.email) {
+        userMap.set(u.uid, u.email);
+      }
+    });
+  } catch (authErr) {
+    console.warn("Avviso lettura Firebase Auth listUsers:", authErr.message);
+  }
 
-  for (const userDoc of usersSnap.docs) {
-    const uid = userDoc.id;
+  // Controlla anche documenti presenti direttamente nella collection 'users' di Firestore
+  try {
+    const usersSnap = await db.collection('users').get();
+    console.log(`Trovati ${usersSnap.size} documenti nella collection 'users' di Firestore.`);
+    usersSnap.forEach(d => {
+      if (!userMap.has(d.id)) {
+        userMap.set(d.id, d.data().email || null);
+      }
+    });
+  } catch (fsErr) {
+    console.warn("Avviso lettura collection users da Firestore:", fsErr.message);
+  }
+
+  console.log(`Totale utenti unici da elaborare: ${userMap.size}`);
+
+  for (const [uid, authEmail] of userMap.entries()) {
     console.log(`\n-----------------------------------------`);
     console.log(`Verifica dati per UID: ${uid}`);
 
-    // Email destinatario
-    let recipientEmail = null;
-    try {
-      const userRecord = await admin.auth().getUser(uid);
-      recipientEmail = userRecord.email;
-    } catch (e) {
-      console.warn(`Impossibile leggere email da Auth per ${uid}:`, e.message);
-    }
-
+    // Leggi profilo per email o crediti: /users/{uid}/profile/data
     const profileSnap = await db.collection('users').doc(uid).collection('profile').doc('data').get();
     const profileData = profileSnap.exists ? profileSnap.data() : {};
-    recipientEmail = recipientEmail || profileData.email;
+    const recipientEmail = authEmail || profileData.email;
 
     if (!recipientEmail) {
       console.log(`Nessun indirizzo email associato all'UID ${uid}, salto.`);

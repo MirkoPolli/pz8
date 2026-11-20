@@ -103,6 +103,16 @@ export default function App() {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
         setUser(currentUser);
+        // Garantisce che il documento principale /users/{uid} esista sempre
+        try {
+          await setDoc(doc(db, 'users', currentUser.uid), {
+            email: currentUser.email,
+            displayName: currentUser.displayName || '',
+            lastLogin: new Date().toISOString()
+          }, { merge: true });
+        } catch (e) {
+          console.warn("Impossibile salvare doc utente principale:", e);
+        }
         notify(`Benvenuto ${currentUser.displayName || currentUser.email}!`, 'success');
       } else {
         setUser(null);
