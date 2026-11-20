@@ -12,7 +12,8 @@ import {
   Send,
   BookUser,
   Clock,
-  Check
+  Check,
+  Search
 } from 'lucide-react';
 import { getTodayDateString, addMonthsToDate } from '../utils/dateUtils';
 
@@ -43,6 +44,8 @@ export default function UserModal({
 
   const [error, setError] = useState('');
   const [showContactDropdown, setShowContactDropdown] = useState(false);
+  const [contactSearch, setContactSearch] = useState('');
+  const [isContactListOpen, setIsContactListOpen] = useState(false);
 
   useEffect(() => {
     if (clientToEdit) {
@@ -76,6 +79,8 @@ export default function UserModal({
     }
     setError('');
     setShowContactDropdown(false);
+    setContactSearch('');
+    setIsContactListOpen(false);
   }, [clientToEdit, isOpen]);
 
   const handleDurationChange = (months) => {
@@ -94,6 +99,8 @@ export default function UserModal({
     if (c.notes && !notes) {
       setNotes(c.notes);
     }
+    setContactSearch('');
+    setIsContactListOpen(false);
     setShowContactDropdown(false);
   };
 
@@ -151,10 +158,16 @@ export default function UserModal({
 
   if (!isOpen) return null;
 
-  // Filtra contatti per suggerimento
-  const matchingContacts = contacts.filter(c => 
-    contactName.trim() ? (c.name || '').toLowerCase().includes(contactName.toLowerCase()) : true
-  );
+  // Filtra contatti da rubrica con barra di ricerca
+  const filteredContacts = contacts.filter(c => {
+    if (!contactSearch.trim()) return true;
+    const s = contactSearch.toLowerCase();
+    return (
+      (c.name || '').toLowerCase().includes(s) ||
+      (c.phone || '').includes(s) ||
+      (c.telegram || '').toLowerCase().includes(s)
+    );
+  });
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm">
@@ -204,8 +217,8 @@ export default function UserModal({
             </div>
           </div>
 
-          {/* Contatto Referente con Selettore Rubrica */}
-          <div className="space-y-2 p-3 rounded-xl bg-[#0a0f1c] border border-[#1d2b45]">
+          {/* Contatto Referente con Ricerca e Selezione Rubrica */}
+          <div className="space-y-2.5 p-3 rounded-xl bg-[#0a0f1c] border border-[#1d2b45]">
             <div className="flex items-center justify-between">
               <label className="text-xs uppercase text-slate-300 font-bold flex items-center gap-1.5">
                 <BookUser className="w-3.5 h-3.5 text-[#00ff9d]" />
@@ -213,35 +226,87 @@ export default function UserModal({
               </label>
               {contacts.length > 0 && (
                 <span className="text-[10px] text-slate-400 font-mono">
-                  {contacts.length} contatti registrati
+                  {contacts.length} contatti in rubrica
                 </span>
               )}
             </div>
 
-            {/* Menu a tendina Rubrica (se presenti contatti) */}
+            {/* Ricerca e scelta da rubrica con filtro */}
             {contacts.length > 0 && (
-              <div>
-                <select
-                  onChange={(e) => handleSelectContactById(e.target.value)}
-                  defaultValue=""
-                  className="w-full bg-[#080c16] border border-[#1e2a42] focus:border-[#00ff9d] text-slate-200 text-xs rounded-lg px-2.5 py-2 outline-none cursor-pointer"
-                >
-                  <option value="" disabled>
-                    -- Scegli da Rubrica (popola tel & telegram) --
-                  </option>
-                  {contacts.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name} {c.phone ? `(${c.phone})` : ''} {c.telegram ? `[TG: ${c.telegram}]` : ''}
-                    </option>
-                  ))}
-                </select>
+              <div className="space-y-1.5">
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-2.5" />
+                  <input
+                    type="text"
+                    value={contactSearch}
+                    onChange={(e) => {
+                      setContactSearch(e.target.value);
+                      setIsContactListOpen(true);
+                    }}
+                    onFocus={() => setIsContactListOpen(true)}
+                    placeholder="Cerca contatto in rubrica (nome, tel, telegram)..."
+                    className="w-full bg-[#080c16] border border-[#1e2a42] focus:border-[#00ff9d] text-slate-200 text-xs rounded-lg pl-8 pr-8 py-2 outline-none transition-colors"
+                  />
+                  {contactSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setContactSearch('')}
+                      className="absolute right-2.5 top-2 text-slate-400 hover:text-white p-0.5 rounded"
+                      title="Svuota ricerca"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Dropdown contatti filtrati */}
+                {isContactListOpen && (
+                  <div className="max-h-44 overflow-y-auto rounded-lg border border-[#233559] bg-[#0c1222] divide-y divide-[#172238] shadow-2xl">
+                    {filteredContacts.length === 0 ? (
+                      <div className="p-2.5 text-center text-slate-500 text-[11px]">
+                        Nessun contatto trovato con "{contactSearch}".
+                      </div>
+                    ) : (
+                      filteredContacts.map((c) => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() => handleSelectContact(c)}
+                          className="w-full text-left p-2.5 hover:bg-[#15233d] transition-colors flex items-center justify-between group"
+                        >
+                          <div className="min-w-0 pr-2">
+                            <div className="font-bold text-white text-xs group-hover:text-[#00ff9d] transition-colors truncate">
+                              {c.name}
+                            </div>
+                            <div className="text-[10px] text-slate-400 flex items-center gap-2 mt-0.5 truncate">
+                              {c.phone && <span>📞 {c.phone}</span>}
+                              {c.telegram && <span>TG: @{c.telegram.replace(/^@/, '')}</span>}
+                            </div>
+                          </div>
+                          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#00ff9d]/10 text-[#00ff9d] border border-[#00ff9d]/30 opacity-70 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                            Seleziona ↵
+                          </span>
+                        </button>
+                      ))
+                    )}
+                    <div className="p-1.5 bg-[#090d18] text-right border-t border-[#1a263d]">
+                      <button
+                        type="button"
+                        onClick={() => setIsContactListOpen(false)}
+                        className="text-[10px] text-slate-400 hover:text-white px-2 py-0.5 rounded hover:bg-slate-800"
+                      >
+                        Chiudi elenco
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
             {/* Nome Contatto input manuale / modificabile */}
             <div>
               <label className="block text-[11px] text-slate-400 mb-1">
-                Nome Contatto:
+                Nome Contatto assegnato:
               </label>
               <input
                 type="text"

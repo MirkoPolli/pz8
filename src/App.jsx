@@ -36,7 +36,7 @@ export default function App() {
   const [contacts, setContacts] = useState([]);
   const [creditData, setCreditData] = useState({ creditsBalance: 0, creditCostUnit: 3.0, history: [] });
 
-  const [filterTab, setFilterTab] = useState('all');
+  const [filterTab, setFilterTab] = useState('active');
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [clientToEdit, setClientToEdit] = useState(null);
   const [isCreditModalOpen, setIsCreditModalOpen] = useState(false);
@@ -77,6 +77,12 @@ export default function App() {
   const [tokenCost, setTokenCost] = useState(() => {
     const saved = localStorage.getItem('pz8_token_cost');
     return saved !== null ? Number(saved) : 3;
+  });
+
+  // Email Notification timing: 'today' (giorno scadenza) o 'day_before' (giorno prima)
+  const [notifyTiming, setNotifyTiming] = useState(() => {
+    const saved = localStorage.getItem('pz8_notify_timing');
+    return saved || 'today';
   });
 
   // Renewal Confirmation state
@@ -164,6 +170,10 @@ export default function App() {
           setTokenCost(Number(data.tokenCost));
           localStorage.setItem('pz8_token_cost', data.tokenCost);
         }
+        if (data.notifyTiming) {
+          setNotifyTiming(data.notifyTiming);
+          localStorage.setItem('pz8_notify_timing', data.notifyTiming);
+        }
       }
     });
 
@@ -197,6 +207,16 @@ export default function App() {
       await setDoc(doc(db, 'users', user.uid, 'settings', 'data'), { tokenCost: val }, { merge: true });
     }
     notify(`Costo credito aggiornato a €${val}`, 'success');
+  };
+
+  const handleChangeNotifyTiming = async (timing) => {
+    if (timing !== 'today' && timing !== 'day_before') return;
+    setNotifyTiming(timing);
+    localStorage.setItem('pz8_notify_timing', timing);
+    if (user) {
+      await setDoc(doc(db, 'users', user.uid, 'settings', 'data'), { notifyTiming: timing }, { merge: true });
+    }
+    notify(`Avviso email impostato: ${timing === 'day_before' ? 'Il giorno prima' : 'Il giorno della scadenza'}`, 'success');
   };
 
   // Auth Handlers
@@ -674,6 +694,8 @@ export default function App() {
         onToggleColumn={handleToggleColumn}
         tokenCost={tokenCost}
         onChangeTokenCost={handleChangeTokenCost}
+        notifyTiming={notifyTiming}
+        onChangeNotifyTiming={handleChangeNotifyTiming}
         user={user}
       />
 

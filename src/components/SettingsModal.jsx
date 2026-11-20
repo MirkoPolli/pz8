@@ -11,7 +11,9 @@ import {
   Coins, 
   Euro, 
   RotateCw, 
-  Smartphone 
+  Smartphone,
+  Mail,
+  Bell
 } from 'lucide-react';
 import { forceReloadApp } from '../utils/reloadApp';
 
@@ -22,6 +24,8 @@ export default function SettingsModal({
   onToggleColumn,
   tokenCost = 3,
   onChangeTokenCost,
+  notifyTiming = 'today',
+  onChangeNotifyTiming,
   user
 }) {
   const [costInput, setCostInput] = useState(tokenCost);
@@ -228,7 +232,75 @@ export default function SettingsModal({
             </button>
           </div>
 
-          {/* Sezione 3: Visibilità Colonne */}
+          {/* Sezione 3: Notifiche Email Scadenze & Alert Crediti */}
+          <div className="p-4 rounded-xl bg-[#0a0f1c] border border-[#1d2b45] space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-[#ffb700]/10 border border-[#ffb700]/30 text-[#ffb700] flex items-center justify-center">
+                  <Mail className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-white font-bold text-xs uppercase tracking-wider">
+                    Avviso Scadenze via Email
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Notifiche inviate ogni mattina alle 09:00 a <span className="text-slate-300 font-mono">{user?.email || 'tua email'}</span>
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <p className="text-[11px] text-slate-400 leading-relaxed">
+              Scegli se desideri ricevere la mail per gli account IPTV il giorno stesso della scadenza oppure il giorno prima.
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => onChangeNotifyTiming('today')}
+                className={`p-3 rounded-xl border text-left transition-all ${
+                  notifyTiming === 'today'
+                    ? 'bg-[#00ff9d]/15 border-[#00ff9d] text-white shadow-[0_0_10px_rgba(0,255,157,0.2)]'
+                    : 'bg-[#121a2c] border-[#1f2d4d] text-slate-400 hover:text-white hover:bg-[#1a263f]'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <span className="font-bold text-xs text-white">Giorno della scadenza</span>
+                  {notifyTiming === 'today' && <Check className="w-3.5 h-3.5 text-[#00ff9d]" />}
+                </div>
+                <p className="text-[10px] text-slate-400 leading-tight">
+                  Email inviata la mattina del giorno in cui scade l'utenza
+                </p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => onChangeNotifyTiming('day_before')}
+                className={`p-3 rounded-xl border text-left transition-all ${
+                  notifyTiming === 'day_before'
+                    ? 'bg-[#00ff9d]/15 border-[#00ff9d] text-white shadow-[0_0_10px_rgba(0,255,157,0.2)]'
+                    : 'bg-[#121a2c] border-[#1f2d4d] text-slate-400 hover:text-white hover:bg-[#1a263f]'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <span className="font-bold text-xs text-white">Il giorno prima (24h)</span>
+                  {notifyTiming === 'day_before' && <Check className="w-3.5 h-3.5 text-[#00ff9d]" />}
+                </div>
+                <p className="text-[10px] text-slate-400 leading-tight">
+                  Email inviata la mattina prima per preparare il rinnovo
+                </p>
+              </button>
+            </div>
+
+            <div className="p-2.5 rounded-lg bg-[#141b2b] border border-[#1e2a40] text-[11px] text-slate-300 flex items-start gap-2">
+              <span className="text-[#00ff9d] font-bold">✓</span>
+              <span>
+                <strong>Alert Crediti Insufficienti:</strong> Se il tuo saldo crediti non è sufficiente per rinnovare gli utenti in scadenza nei prossimi 3 giorni, riceverai automaticamente un'email di avviso per ricaricare le scorte.
+              </span>
+            </div>
+          </div>
+
+          {/* Sezione 4: Visibilità Colonne */}
           <div className="space-y-2">
             <div className="text-slate-400 text-xs uppercase tracking-wider font-bold">
               Visibilità Colonne e Campi

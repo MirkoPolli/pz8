@@ -34,11 +34,11 @@ jobs:
         env:
           FIREBASE_SERVICE_ACCOUNT: \${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           RESEND_API_KEY: \${{ secrets.RESEND_API_KEY }}
-        run: node scripts/daily-check.js
+        run: node scripts/daily-check.cjs
 `;
 
   const runnerScript = `/**
- * scripts/daily-check.js
+ * scripts/daily-check.cjs
  * Gira ogni mattina alle 09:00 su GitHub Actions
  * Itera TUTTI gli utenti registrati su Firebase (tu e il tuo amico)
  * e invia a ciascuno l'email con le sue utenze in scadenza.

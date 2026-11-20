@@ -15,7 +15,9 @@ import {
   RotateCcw,
   Send,
   Euro,
-  Check
+  Check,
+  X,
+  Users
 } from 'lucide-react';
 import { 
   formatDateItalian, 
@@ -41,16 +43,14 @@ export default function ClientList({
 }) {
   const [search, setSearch] = useState('');
 
-  // Clean phone number for WhatsApp
-  const getWhatsAppUrl = (phone, contactName, user, expirationDate) => {
+  // Clean phone number for WhatsApp - Messaggio predefinito: "ciao scade oggi"
+  const getWhatsAppUrl = (phone) => {
     if (!phone) return null;
     let clean = phone.replace(/\D/g, '');
     if (clean.length === 10 && !clean.startsWith('39')) {
       clean = '39' + clean;
     }
-    const message = encodeURIComponent(
-      `Ciao ${contactName || user}, ti ricordo che il tuo abbonamento IPTV scade il ${formatDateItalian(expirationDate)}. Fammi sapere se desideri rinnovare!`
-    );
+    const message = encodeURIComponent('ciao scade oggi');
     return `https://wa.me/${clean}?text=${message}`;
   };
 
@@ -68,6 +68,41 @@ export default function ClientList({
   const unpaidClients = clients.filter(c => c.paymentStatus === 'unpaid' && (Number(c.amountDue) > 0));
   const totalAmountDue = unpaidClients.reduce((sum, c) => sum + (Number(c.amountDue) || 0), 0);
 
+  // Raggruppamento debiti per persona / contatto unico (se un contatto ha più username conta 1 solo cliente)
+  const debtorsMap = new Map();
+  unpaidClients.forEach(c => {
+    const rawName = (c.contactName || '').trim();
+    const rawPhone = (c.phone || '').trim();
+    const key = (rawName ? rawName.toLowerCase() : (rawPhone || c.user.toLowerCase()));
+    const displayName = rawName || c.user;
+
+    if (!debtorsMap.has(key)) {
+      debtorsMap.set(key, {
+        key,
+        name: displayName,
+        phone: c.phone || '',
+        telegram: c.telegram || '',
+        totalDue: 0,
+        accounts: []
+      });
+    }
+    const debtor = debtorsMap.get(key);
+    debtor.totalDue += (Number(c.amountDue) || 0);
+    debtor.accounts.push({
+      id: c.id,
+      user: c.user,
+      amountDue: Number(c.amountDue) || 0,
+      monthlyCost: c.monthlyCost,
+      expirationDate: c.expirationDate,
+      rawClient: c
+    });
+    if (!debtor.phone && c.phone) debtor.phone = c.phone;
+    if (!debtor.telegram && c.telegram) debtor.telegram = c.telegram;
+  });
+
+  const uniqueDebtors = Array.from(debtorsMap.values()).sort((a, b) => b.totalDue - a.totalDue);
+  const uniqueDebtorsCount = uniqueDebtors.length;
+
   // Filter clients
   const filteredClients = clients.filter(c => {
     // Search text match
@@ -81,7 +116,9 @@ export default function ClientList({
     if (!matchSearch) return false;
 
     // Tab filter
-    if (filterTab === 'all') return true;
+    if (filterTab === 'active') {
+      return c.isActive;
+    }
     if (filterTab === 'expiring') {
       return c.isActive && isExpiringSoon(c.expirationDate, 3);
     }
@@ -90,9 +127,6 @@ export default function ClientList({
     }
     if (filterTab === 'unpaid') {
       return c.paymentStatus === 'unpaid' && (Number(c.amountDue) > 0);
-    }
-    if (filterTab === 'active') {
-      return c.isActive;
     }
     if (filterTab === 'inactive') {
       return !c.isActive;
@@ -114,7 +148,7 @@ export default function ClientList({
       {/* Controls Bar: Search & Filters */}
       <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 bg-[#0d121f] p-3 rounded-xl border border-[#1b253b]">
         
-        {/* Search Input */}
+        {/* Search Input con tasto 'X' per cancellare subito */}
         <div className="relative flex-1">
           <Search className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
           <input
@@ -122,24 +156,33 @@ export default function ClientList({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Cerca per username, contatto, tel o telegram..."
-            className="w-full bg-[#080b12] border border-[#1e2a42] focus:border-[#00ff9d] rounded-lg pl-9 pr-3 py-1.5 text-xs font-mono text-white outline-none transition-colors"
+            className="w-full bg-[#080b12] border border-[#1e2a42] focus:border-[#00ff9d] rounded-lg pl-9 pr-8 py-1.5 text-xs font-mono text-white outline-none transition-colors"
           />
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch('')}
+              className="absolute right-2.5 top-2 text-slate-400 hover:text-white p-0.5 rounded transition-colors"
+              title="Cancella ricerca"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
 
-        {/* Filter Tabs */}
+        {/* Filter Tabs: Solo Attivi come default, In Scadenza, Scaduti, Da Saldare, Disattivati (Rimosso 'Tutti') */}
         <div className="flex items-center gap-1 overflow-x-auto pb-1 md:pb-0 text-xs font-mono">
           {[
-            { id: 'all', label: 'Tutti' },
+            { id: 'active', label: 'Attivi' },
             { id: 'expiring', label: 'In Scadenza (≤3gg)', highlight: true },
             { id: 'expired', label: 'Scaduti' },
             { 
               id: 'unpaid', 
               label: `Da Saldare (€${totalAmountDue})`, 
               isRed: totalAmountDue > 0, 
-              badge: unpaidClients.length 
+              badge: uniqueDebtorsCount 
             },
-            { id: 'active', label: 'Attivi' },
-            { id: 'inactive', label: 'Disattivi' },
+            { id: 'inactive', label: 'Disattivati' },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -163,15 +206,116 @@ export default function ClientList({
 
       </div>
 
-      {/* Counter (Rimosso Saldo Crediti a destra) */}
+      {/* Counter - Totale da riscuotere calcolato in base al contatto unico */}
       <div className="flex items-center justify-between text-xs font-mono text-slate-400 px-1">
         <span>Risultati visualizzati: <strong className="text-white">{sortedClients.length}</strong></span>
         {totalAmountDue > 0 && (
           <span className="text-[#ff6b8b]">
-            Totale da riscuotere: <strong className="text-[#ff3366]">€{totalAmountDue}</strong> ({unpaidClients.length} {unpaidClients.length === 1 ? 'cliente' : 'clienti'})
+            Totale da riscuotere: <strong className="text-[#ff3366]">€{totalAmountDue}</strong> ({uniqueDebtorsCount} {uniqueDebtorsCount === 1 ? 'cliente' : 'clienti'})
           </span>
         )}
       </div>
+
+      {/* --- SEZIONE DA SALDARE: RIEPILOGO PERSONE CON TOTALI --- */}
+      {filterTab === 'unpaid' && uniqueDebtors.length > 0 && (
+        <div className="p-4 rounded-xl bg-[#120d18] border border-[#ff3366]/40 shadow-xl space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-[#ff3366]/20">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#ff3366] animate-pulse"></span>
+              <h3 className="font-mono font-bold text-sm text-white uppercase tracking-wider flex items-center gap-2">
+                <span>Riepilogo Debitori per Persona</span>
+                <span className="px-2 py-0.5 rounded-full text-xs bg-[#ff3366]/20 text-[#ff6b8b] border border-[#ff3366]/40">
+                  {uniqueDebtorsCount} {uniqueDebtorsCount === 1 ? 'persona' : 'persone'}
+                </span>
+              </h3>
+            </div>
+            <div className="text-left sm:text-right">
+              <span className="text-xs text-slate-400 font-mono">Totale complessivo: </span>
+              <strong className="text-base text-[#ff3366] font-mono font-bold">€{totalAmountDue}</strong>
+            </div>
+          </div>
+
+          {/* Griglia card per persona con totali ed elenco account */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+            {uniqueDebtors.map((debtor) => {
+              const waUrl = getWhatsAppUrl(debtor.phone);
+              const tgUrl = getTelegramUrl(debtor.telegram);
+
+              return (
+                <div 
+                  key={debtor.key}
+                  className="p-3 rounded-lg bg-[#0a070e] border border-[#ff3366]/25 hover:border-[#ff3366]/50 transition-all flex flex-col justify-between"
+                >
+                  <div>
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <div className="min-w-0">
+                        <span className="font-bold text-white text-xs truncate block" title={debtor.name}>
+                          {debtor.name}
+                        </span>
+                        {debtor.phone && (
+                          <span className="text-[10px] text-slate-400 font-mono">
+                            {debtor.phone}
+                          </span>
+                        )}
+                      </div>
+                      <span className="px-2 py-0.5 rounded text-xs font-mono font-bold bg-[#ff3366]/20 text-[#ff3366] border border-[#ff3366]/50 flex-shrink-0">
+                        €{debtor.totalDue}
+                      </span>
+                    </div>
+
+                    {/* Elenco account associati a questa persona */}
+                    <div className="space-y-1 mb-2.5">
+                      {debtor.accounts.map((acc, idx) => (
+                        <div key={idx} className="flex items-center justify-between text-[11px] font-mono text-slate-300 bg-[#160e1d] px-2 py-1 rounded border border-[#2d1b33]">
+                          <span className="truncate max-w-[140px] text-slate-200">
+                            📺 {acc.user}
+                          </span>
+                          <span className="text-[#ff6b8b] font-bold">
+                            €{acc.amountDue}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Azioni rapide di contatto */}
+                  <div className="flex items-center justify-between pt-2 border-t border-[#2d1b33] text-[11px]">
+                    <span className="text-slate-500 font-mono text-[10px]">
+                      {debtor.accounts.length} {debtor.accounts.length === 1 ? 'account' : 'account'}
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      {waUrl && (
+                        <a
+                          href={waUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="p-1 px-2 rounded bg-[#25D366]/10 text-[#25D366] hover:bg-[#25D366]/20 border border-[#25D366]/30 transition-colors flex items-center gap-1 font-bold text-[10px]"
+                          title="Scrivi su WhatsApp (ciao scade oggi)"
+                        >
+                          <MessageCircle className="w-3 h-3" />
+                          <span>WhatsApp</span>
+                        </a>
+                      )}
+                      {tgUrl && (
+                        <a
+                          href={tgUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="p-1 px-2 rounded bg-[#0088cc]/10 text-[#0088cc] hover:bg-[#0088cc]/20 border border-[#0088cc]/30 transition-colors flex items-center gap-1 font-bold text-[10px]"
+                          title="Scrivi su Telegram"
+                        >
+                          <Send className="w-3 h-3" />
+                          <span>TG</span>
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* --- DESKTOP TABLE VIEW --- */}
       <div className="hidden md:block rounded-xl border border-[#1b253b] bg-[#0d121f] overflow-hidden">

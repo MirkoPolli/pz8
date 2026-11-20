@@ -25,4 +25,4 @@ jobs:
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
-        run: node scripts/daily-check.js
+        run: node scripts/daily-check.cjs

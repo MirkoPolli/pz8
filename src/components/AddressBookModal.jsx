@@ -78,13 +78,13 @@ export default function AddressBookModal({
   };
 
   // Helper per url whatsapp
-  const getWhatsAppUrl = (p, contactName) => {
+  const getWhatsAppUrl = (p) => {
     if (!p) return null;
     let clean = p.replace(/\D/g, '');
     if (clean.length === 10 && !clean.startsWith('39')) {
       clean = '39' + clean;
     }
-    const msg = encodeURIComponent(`Ciao ${contactName || ''}!`);
+    const msg = encodeURIComponent('ciao scade oggi');
     return `https://wa.me/${clean}?text=${msg}`;
   };
 
@@ -141,8 +141,18 @@ export default function AddressBookModal({
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Cerca contatto per nome, telefono o telegram..."
-              className="w-full bg-[#080b12] border border-[#1e2a42] focus:border-[#00ff9d] rounded-lg pl-9 pr-3 py-1.5 text-xs font-mono text-white outline-none"
+              className="w-full bg-[#080b12] border border-[#1e2a42] focus:border-[#00ff9d] rounded-lg pl-9 pr-8 py-1.5 text-xs font-mono text-white outline-none"
             />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                className="absolute right-2.5 top-2 text-slate-400 hover:text-white p-0.5 rounded transition-colors"
+                title="Cancella ricerca"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
 
           <button
