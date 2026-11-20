@@ -322,23 +322,23 @@ export default function ClientList({
         <table className="w-full text-left text-xs font-mono">
           <thead className="bg-[#090d16] border-b border-[#1b253b] text-slate-400 uppercase tracking-wider">
             <tr>
-              <th className="py-3 px-4">Stato</th>
-              <th className="py-3 px-4">Username Account</th>
+              <th className="py-2.5 px-4 whitespace-nowrap">Stato</th>
+              <th className="py-2.5 px-4 whitespace-nowrap">Username Account</th>
               {visibleColumns.contactName !== false && (
-                <th className="py-3 px-4">Contatto & Chat</th>
+                <th className="py-2.5 px-4 whitespace-nowrap">Contatto & Chat</th>
               )}
-              <th className="py-3 px-4">Scadenza</th>
+              <th className="py-2.5 px-4 whitespace-nowrap">Scadenza</th>
               {visibleColumns.monthlyCost !== false && (
-                <th className="py-3 px-4">Costo</th>
+                <th className="py-2.5 px-4 whitespace-nowrap">Costo</th>
               )}
               {visibleColumns.payment !== false && (
-                <th className="py-3 px-4">Pagamento</th>
+                <th className="py-2.5 px-4 whitespace-nowrap">Pagamento</th>
               )}
               {visibleColumns.totalCreditsUsed && (
-                <th className="py-3 px-4">Tot. Crediti</th>
+                <th className="py-2.5 px-4 whitespace-nowrap">Tot. Crediti</th>
               )}
-              <th className="py-3 px-4 text-center">Rinnova</th>
-              <th className="py-3 px-4 text-right">Azioni</th>
+              <th className="py-2.5 px-4 text-center whitespace-nowrap">Rinnova</th>
+              <th className="py-2.5 px-4 text-right whitespace-nowrap">Azioni</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[#172033]">
@@ -365,7 +365,7 @@ export default function ClientList({
                     } ${isUnpaid ? 'bg-[#ff3366]/[0.03]' : ''}`}
                   >
                     {/* Active Toggle */}
-                    <td className="py-3 px-4">
+                    <td className="py-2.5 px-4 whitespace-nowrap">
                       <button
                         onClick={() => onToggleActive(client.id)}
                         className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold ${
@@ -379,19 +379,19 @@ export default function ClientList({
                     </td>
 
                     {/* Username */}
-                    <td className="py-3 px-4 font-bold text-white">
-                      {client.user}
+                    <td className="py-2.5 px-4 font-bold text-white whitespace-nowrap">
+                      <span>{client.user}</span>
                       {visibleColumns.notes !== false && client.notes && (
-                        <div className="text-[10px] text-slate-400 font-normal font-sans truncate max-w-[150px]">
-                          {client.notes}
-                        </div>
+                        <span className="text-[10px] text-slate-400 font-normal font-sans ml-2 truncate max-w-[120px] inline-block align-middle">
+                          ({client.notes})
+                        </span>
                       )}
                     </td>
 
                     {/* Contact & WhatsApp & Telegram */}
                     {visibleColumns.contactName !== false && (
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-1.5 flex-wrap">
+                      <td className="py-2.5 px-4 whitespace-nowrap">
+                        <div className="flex items-center gap-1.5 flex-nowrap">
                           <span className="text-slate-200">{client.contactName || '-'}</span>
                           
                           {/* WhatsApp icon */}
@@ -434,8 +434,8 @@ export default function ClientList({
                     )}
 
                     {/* Expiration Date & Badge */}
-                    <td className="py-3 px-4">
-                      <div className="flex items-center gap-1.5">
+                    <td className="py-2.5 px-4 whitespace-nowrap">
+                      <div className="flex items-center gap-1.5 flex-nowrap">
                         <span className={`font-bold ${
                           expired 
                             ? 'text-[#ff3366]' 
@@ -468,16 +468,16 @@ export default function ClientList({
 
                     {/* Cost */}
                     {visibleColumns.monthlyCost !== false && (
-                      <td className="py-3 px-4 text-[#00f0ff] font-bold">
+                      <td className="py-2.5 px-4 text-[#00f0ff] font-bold whitespace-nowrap">
                         {client.monthlyCost || 10}€
                       </td>
                     )}
 
                     {/* Sezione Pagamento */}
                     {visibleColumns.payment !== false && (
-                      <td className="py-3 px-4">
+                      <td className="py-2.5 px-4 whitespace-nowrap">
                         {isUnpaid ? (
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex items-center gap-1.5 flex-nowrap">
                             <button
                               onClick={() => onOpenPaymentModal(client)}
                               className="px-2 py-0.5 rounded bg-[#ff3366]/20 hover:bg-[#ff3366]/30 border border-[#ff3366]/50 text-[#ff3366] font-bold text-[10px] flex items-center gap-1"
@@ -507,14 +507,14 @@ export default function ClientList({
 
                     {/* Total Credits Used */}
                     {visibleColumns.totalCreditsUsed && (
-                      <td className="py-3 px-4 text-slate-300 font-bold">
+                      <td className="py-2.5 px-4 text-slate-300 font-bold whitespace-nowrap">
                         {client.totalCreditsUsed || 0} CR
                       </td>
                     )}
 
                     {/* Renewal Buttons */}
-                    <td className="py-3 px-4">
-                      <div className="flex items-center justify-center gap-1.5">
+                    <td className="py-2.5 px-4 whitespace-nowrap">
+                      <div className="flex items-center justify-center gap-1.5 flex-nowrap">
                         <button
                           onClick={() => onRequestRenew(client, 1)}
                           className="px-2.5 py-1 rounded bg-[#162035] hover:bg-[#00ff9d] hover:text-black border border-[#1f2d4d] text-slate-300 text-xs font-bold transition-all"
@@ -552,8 +552,8 @@ export default function ClientList({
                     </td>
 
                     {/* Actions: Edit & Delete */}
-                    <td className="py-3 px-4 text-right">
-                      <div className="flex items-center justify-end gap-1">
+                    <td className="py-2.5 px-4 text-right whitespace-nowrap">
+                      <div className="flex items-center justify-end gap-1 flex-nowrap">
                         <button
                           onClick={() => onEdit(client)}
                           className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"

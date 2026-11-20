@@ -74,24 +74,6 @@ export default function StatsBar({
         </div>
       )}
 
-      {/* Unpaid Alert Banner (Se ci sono pagamenti in sospeso) */}
-      {totalAmountDue > 0 && (
-        <div className="p-3 rounded-xl bg-[#ff3366]/10 border border-[#ff3366]/30 flex items-center justify-between gap-3 text-xs font-mono text-[#ff6b8b]">
-          <div className="flex items-center gap-2">
-            <Coins className="w-4 h-4 text-[#ff3366] flex-shrink-0" />
-            <span>
-              Hai <strong>€{totalAmountDue}</strong> da riscuotere da <strong>{unpaidClients.length}</strong> {unpaidClients.length === 1 ? 'cliente' : 'clienti'}.
-            </span>
-          </div>
-          <button
-            onClick={onFilterUnpaid}
-            className="px-2.5 py-1 bg-[#ff3366]/20 hover:bg-[#ff3366] hover:text-white border border-[#ff3366]/40 text-white font-bold rounded-lg transition-all text-xs"
-          >
-            Mostra da Saldare →
-          </button>
-        </div>
-      )}
-
       {/* KPI Cards Grid */}
       <div className={`grid grid-cols-2 ${isAdmin ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-3`}>
         
