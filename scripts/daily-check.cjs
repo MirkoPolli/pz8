@@ -28,21 +28,29 @@ admin.initializeApp({
 
 const db = admin.firestore();
 
+function getRomeDate(offsetDays = 0) {
+  const d = new Date();
+  if (offsetDays !== 0) {
+    d.setDate(d.getDate() + offsetDays);
+  }
+  const itDateStr = d.toLocaleDateString('it-IT', { timeZone: 'Europe/Rome' });
+  const [day, m, y] = itDateStr.split('/');
+  return new Date(`${y}-${m.padStart(2, '0')}-${day.padStart(2, '0')}T00:00:00`);
+}
+
 function getTodayString() {
   const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
+  const itDateStr = d.toLocaleDateString('it-IT', { timeZone: 'Europe/Rome' });
+  const [day, m, y] = itDateStr.split('/');
+  return `${y}-${m.padStart(2, '0')}-${day.padStart(2, '0')}`;
 }
 
 function getTomorrowString() {
   const d = new Date();
   d.setDate(d.getDate() + 1);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
+  const itDateStr = d.toLocaleDateString('it-IT', { timeZone: 'Europe/Rome' });
+  const [day, m, y] = itDateStr.split('/');
+  return `${y}-${m.padStart(2, '0')}-${day.padStart(2, '0')}`;
 }
 
 async function run() {
@@ -108,14 +116,9 @@ async function run() {
     const clientsToNotify = [];
     let expiringNext3Days = 0;
 
-    const todayDate = new Date();
-    todayDate.setHours(0, 0, 0, 0);
-
-    const tomorrowDate = new Date(todayDate);
-    tomorrowDate.setDate(todayDate.getDate() + 1);
-
-    const threeDaysDate = new Date(todayDate);
-    threeDaysDate.setDate(todayDate.getDate() + 3);
+    const todayDate = getRomeDate(0);
+    const tomorrowDate = getRomeDate(1);
+    const threeDaysDate = getRomeDate(3);
 
     clientsSnap.forEach(docSnap => {
       const c = docSnap.data();
