@@ -318,7 +318,7 @@ export default function App() {
       if (clientToEdit && clientToEdit.id) {
         // EDIT EXISTING
         if (user) {
-          await updateDoc(doc(db, 'users', user.uid, 'clients', clientToEdit.id), clientFields);
+          await setDoc(doc(db, 'users', user.uid, 'clients', clientToEdit.id), clientFields, { merge: true });
         }
         notify(`Utente "${clientFields.user}" salvato.`, 'success');
       } else {
@@ -400,14 +400,14 @@ export default function App() {
     };
 
     if (user) {
-      await updateDoc(doc(db, 'users', user.uid, 'clients', client.id), {
+      await setDoc(doc(db, 'users', user.uid, 'clients', client.id), {
         expirationDate: newExpiration,
         isActive: true,
         totalCreditsUsed: (client.totalCreditsUsed || 0) + months,
         lastRenewal: renewalRecord,
         paymentStatus: newPaymentStatus,
         amountDue: newAmountDue
-      });
+      }, { merge: true });
     }
 
     if (isAdmin) {
@@ -437,11 +437,11 @@ export default function App() {
     };
 
     if (user) {
-      await updateDoc(doc(db, 'users', user.uid, 'clients', client.id), {
+      await setDoc(doc(db, 'users', user.uid, 'clients', client.id), {
         expirationDate: prevExpirationDate,
         totalCreditsUsed: Math.max(0, (client.totalCreditsUsed || 0) - months),
         lastRenewal: null
-      });
+      }, { merge: true });
     }
 
     // Refund credits
@@ -452,7 +452,7 @@ export default function App() {
   // Save / Update Payment status
   const handleSavePayment = async (clientId, paymentData) => {
     if (!user) return;
-    await updateDoc(doc(db, 'users', user.uid, 'clients', clientId), paymentData);
+    await setDoc(doc(db, 'users', user.uid, 'clients', clientId), paymentData, { merge: true });
     if (paymentData.paymentStatus === 'paid') {
       notify("Pagamento registrato: tutto saldato!", 'success');
     } else {
@@ -463,11 +463,11 @@ export default function App() {
   // Quick Pay (1-click mark as paid)
   const handleQuickPay = async (client) => {
     if (!user) return;
-    await updateDoc(doc(db, 'users', user.uid, 'clients', client.id), {
+    await setDoc(doc(db, 'users', user.uid, 'clients', client.id), {
       paymentStatus: 'paid',
       amountDue: 0,
       paymentNote: ''
-    });
+    }, { merge: true });
     notify(`Pagamento di €${client.amountDue || 0} per "${client.user}" incassato con successo!`, 'success');
   };
 
@@ -478,7 +478,7 @@ export default function App() {
     const newStatus = !client.isActive;
 
     if (user) {
-      await updateDoc(doc(db, 'users', user.uid, 'clients', clientId), { isActive: newStatus });
+      await setDoc(doc(db, 'users', user.uid, 'clients', clientId), { isActive: newStatus }, { merge: true });
     }
     notify(`Stato di "${client.user}" impostato su ${newStatus ? 'ATTIVO' : 'OFF'}.`, 'info');
   };
