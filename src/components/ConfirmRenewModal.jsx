@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { AlertCircle, Calendar, Coins, ArrowRight, X, Euro, Check, Clock } from 'lucide-react';
+import { AlertCircle, Calendar, Coins, ArrowRight, X, Euro, Check, Clock, RotateCw } from 'lucide-react';
 import { formatDateItalian, addMonthsToDate } from '../utils/dateUtils';
 
 export default function ConfirmRenewModal({
@@ -8,7 +8,8 @@ export default function ConfirmRenewModal({
   onConfirm,
   client,
   months,
-  creditsBalance
+  creditsBalance,
+  isAdmin = true
 }) {
   if (!isOpen || !client) return null;
 
@@ -37,7 +38,11 @@ export default function ConfirmRenewModal({
         {/* Header */}
         <div className="px-5 py-4 border-b border-[#1f2a45] flex items-center justify-between bg-[#0e1320]">
           <div className="flex items-center gap-2">
-            <Coins className="w-5 h-5 text-[#00f0ff]" />
+            {isAdmin ? (
+              <Coins className="w-5 h-5 text-[#00f0ff]" />
+            ) : (
+              <RotateCw className="w-5 h-5 text-[#00ff9d]" />
+            )}
             <h2 className="font-mono font-bold text-white text-base">
               Conferma Rinnovo Abbonamento
             </h2>
@@ -85,18 +90,20 @@ export default function ConfirmRenewModal({
             </div>
           </div>
 
-          {/* Credit deduction warning */}
-          <div className="p-3 rounded-xl bg-[#141d30] border border-[#233559] flex items-center justify-between text-slate-300">
-            <div>
-              <div>Costo operazione: <strong className="text-[#ffb700]">-{months} Crediti</strong></div>
-              <div className="text-[11px] text-slate-400 mt-0.5">
-                Saldo dopo il rinnovo: <strong className={remainingCredits < 0 ? 'text-[#ff3366]' : 'text-white'}>{remainingCredits} CR</strong>
+          {/* Credit deduction warning - Solo se in modalità crediti attiva (Mirko) */}
+          {isAdmin && (
+            <div className="p-3 rounded-xl bg-[#141d30] border border-[#233559] flex items-center justify-between text-slate-300">
+              <div>
+                <div>Costo operazione: <strong className="text-[#ffb700]">-{months} Crediti</strong></div>
+                <div className="text-[11px] text-slate-400 mt-0.5">
+                  Saldo dopo il rinnovo: <strong className={remainingCredits < 0 ? 'text-[#ff3366]' : 'text-white'}>{remainingCredits} CR</strong>
+                </div>
+              </div>
+              <div className="text-right text-[10px] text-slate-500">
+                (Annullabile in seguito)
               </div>
             </div>
-            <div className="text-right text-[10px] text-slate-500">
-              (Annullabile in seguito)
-            </div>
-          </div>
+          )}
 
           {/* Opzione Pagamento Rinnovo */}
           <div className="p-3 rounded-xl bg-[#0d121f] border border-[#1a243a] space-y-2">
@@ -149,7 +156,7 @@ export default function ConfirmRenewModal({
             onClick={handleConfirmClick}
             className="px-5 py-2 rounded-lg bg-[#00ff9d] hover:bg-[#00dd87] text-black font-bold transition-all shadow-[0_0_15px_rgba(0,255,157,0.3)]"
           >
-            Conferma Rinnovo (-{months} CR)
+            {isAdmin ? `Conferma Rinnovo (-${months} CR)` : 'Conferma Rinnovo'}
           </button>
         </div>
 

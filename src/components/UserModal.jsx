@@ -25,7 +25,8 @@ export default function UserModal({
   clientToEdit, 
   currentCredits,
   contacts = [],
-  onUndoRenew
+  onUndoRenew,
+  isAdmin = true
 }) {
   const isEditing = Boolean(clientToEdit && clientToEdit.id);
 
@@ -135,7 +136,7 @@ export default function UserModal({
       return;
     }
 
-    if (!isEditing && currentCredits < initialMonths) {
+    if (!isEditing && isAdmin && currentCredits < initialMonths) {
       setError(`Crediti insufficienti! Hai ${currentCredits} crediti ma ne servono ${initialMonths}. Ricarica prima i crediti.`);
       return;
     }
@@ -149,7 +150,7 @@ export default function UserModal({
       expirationDate,
       isActive,
       notes: notes.trim(),
-      deductCredits: isEditing ? 0 : initialMonths,
+      deductCredits: (!isEditing && isAdmin) ? initialMonths : 0,
       paymentStatus,
       amountDue: paymentStatus === 'paid' ? 0 : (Number(amountDue) || 0),
       paymentNote: paymentNote.trim()
@@ -405,13 +406,17 @@ export default function UserModal({
                     }`}
                   >
                     {m} {m === 1 ? 'Mese' : 'Mesi'}
-                    <div className="text-[10px] opacity-75 font-normal">(-{m} cred)</div>
+                    {isAdmin && (
+                      <div className="text-[10px] opacity-75 font-normal">(-{m} cred)</div>
+                    )}
                   </button>
                 ))}
               </div>
               <div className="text-[11px] text-slate-400 flex items-center justify-between pt-1">
-                <span>Scadenza calcolata: <strong className="text-white">{expirationDate}</strong></span>
-                <span className="text-[#ffb700]">Scalati: {initialMonths} Crediti</span>
+                <span>Scadenza calcolata: <strong className="text-white">{formatDateItalian(expirationDate)}</strong></span>
+                {isAdmin && (
+                  <span className="text-[#ffb700]">Scalati: {initialMonths} Crediti</span>
+                )}
               </div>
             </div>
           )}
@@ -419,13 +424,21 @@ export default function UserModal({
           {/* Expiration Date (editable) & Monthly Cost */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs uppercase text-slate-400 mb-1">
-                Data Scadenza <span className="text-[#00ff9d]">*</span>
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs uppercase text-slate-400">
+                  Data Scadenza <span className="text-[#00ff9d]">*</span>
+                </label>
+                {expirationDate && (
+                  <span className="text-[11px] font-mono text-[#00ff9d] font-bold">
+                    {formatDateItalian(expirationDate)}
+                  </span>
+                )}
+              </div>
               <input
                 type="date"
                 value={expirationDate}
                 onChange={(e) => setExpirationDate(e.target.value)}
+                style={{ colorScheme: 'dark' }}
                 className="w-full bg-[#0a0d14] border border-[#1f2a45] focus:border-[#00ff9d] rounded-lg px-3 py-2 text-white text-xs outline-none transition-colors"
                 required
               />

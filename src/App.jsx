@@ -410,9 +410,11 @@ export default function App() {
       });
     }
 
-    handleDeductCredits(months, `Rinnovo +${months}M per "${client.user}"`);
+    if (isAdmin) {
+      handleDeductCredits(months, `Rinnovo +${months}M per "${client.user}"`);
+    }
     notify(
-      `Rinnovato "${client.user}" per +${months} Mesi fino al ${newExpiration} (-${months} crediti)${markAsUnpaid ? ` • Da saldare: €${newAmountDue}` : ''}`,
+      `Rinnovato "${client.user}" per +${months} Mesi fino al ${formatDateItalian(newExpiration)}${isAdmin ? ` (-${months} crediti)` : ''}${markAsUnpaid ? ` • Da saldare: €${newAmountDue}` : ''}`,
       'success',
       { label: 'Annulla', onClick: () => handleUndoRenew(updatedClient) }
     );
@@ -687,6 +689,7 @@ export default function App() {
         currentCredits={creditData.creditsBalance || 0}
         contacts={contacts}
         onUndoRenew={handleUndoRenew}
+        isAdmin={isAdmin}
       />
 
       <CreditModal
@@ -717,6 +720,7 @@ export default function App() {
         client={renewConfirmState.client}
         months={renewConfirmState.months}
         creditsBalance={creditData.creditsBalance || 0}
+        isAdmin={isAdmin}
       />
 
       {/* Address Book Modal */}

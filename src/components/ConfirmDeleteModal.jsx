@@ -1,5 +1,6 @@
 import React from 'react';
 import { AlertTriangle, Trash2, X } from 'lucide-react';
+import { formatDateItalian } from '../utils/dateUtils';
 
 export default function ConfirmDeleteModal({
   isOpen,
@@ -45,7 +46,7 @@ export default function ConfirmDeleteModal({
             {client.contactName && (
               <div>Referente: <span className="text-white">{client.contactName}</span></div>
             )}
-            <div>Scadenza: <span className="text-slate-200">{client.expirationDate || '-'}</span></div>
+            <div>Scadenza: <span className="text-slate-200">{formatDateItalian(client.expirationDate)}</span></div>
             <div>Costo: <span className="text-[#00f0ff] font-bold">{client.monthlyCost || 10}€</span></div>
           </div>
         </div>
