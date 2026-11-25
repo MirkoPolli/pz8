@@ -80,10 +80,25 @@ export default function App() {
     return saved !== null ? Number(saved) : 3;
   });
 
-  // Email Notification timing: 'today' (giorno scadenza), 'day_before' (1 giorno prima), 'two_days_before' (2 giorni prima)
-  const [notifyTiming, setNotifyTiming] = useState(() => {
-    const saved = localStorage.getItem('pz8_notify_timing');
-    return saved || 'today';
+  // Email Notification timings (selezione multipla tra 'today', 'day_before', 'two_days_before')
+  const VALID_NOTIFY_TIMINGS = ['today', 'day_before', 'two_days_before'];
+  const [notifyTimings, setNotifyTimings] = useState(() => {
+    try {
+      const savedMulti = localStorage.getItem('pz8_notify_timings');
+      if (savedMulti) {
+        const parsed = JSON.parse(savedMulti);
+        if (Array.isArray(parsed)) {
+          return parsed.filter(t => ['today', 'day_before', 'two_days_before'].includes(t));
+        }
+      }
+    } catch {
+      // ignore malformed localStorage
+    }
+    const legacy = localStorage.getItem('pz8_notify_timing');
+    if (legacy && ['today', 'day_before', 'two_days_before'].includes(legacy)) {
+      return [legacy];
+    }
+    return ['today'];
   });
 
   // Renewal Confirmation state
@@ -187,9 +202,18 @@ export default function App() {
           setTokenCost(Number(data.tokenCost));
           localStorage.setItem('pz8_token_cost', data.tokenCost);
         }
-        if (data.notifyTiming) {
-          setNotifyTiming(data.notifyTiming);
-          localStorage.setItem('pz8_notify_timing', data.notifyTiming);
+        if (Array.isArray(data.notifyTimings)) {
+          const valid = data.notifyTimings.filter(t => VALID_NOTIFY_TIMINGS.includes(t));
+          setNotifyTimings(valid);
+          localStorage.setItem('pz8_notify_timings', JSON.stringify(valid));
+        } else if (data.notifyTiming) {
+          const migrated = VALID_NOTIFY_TIMINGS.includes(data.notifyTiming)
+            ? [data.notifyTiming]
+            : data.notifyTiming === 'none'
+            ? []
+            : ['today'];
+          setNotifyTimings(migrated);
+          localStorage.setItem('pz8_notify_timings', JSON.stringify(migrated));
         }
       }
     });
@@ -226,19 +250,36 @@ export default function App() {
     notify(`Costo credito aggiornato a €${val}`, 'success');
   };
 
-  const handleChangeNotifyTiming = async (timing) => {
+  const handleToggleNotifyTiming = async (timing) => {
     const timingLabels = {
-      today: 'Il giorno della scadenza',
-      day_before: 'Il giorno prima (24h)',
-      two_days_before: '2 giorni prima (48h)'
+      today: 'Giorno scadenza',
+      day_before: '1 giorno prima',
+      two_days_before: '2 giorni prima'
     };
     if (!timingLabels[timing]) return;
-    setNotifyTiming(timing);
-    localStorage.setItem('pz8_notify_timing', timing);
-    if (user) {
-      await setDoc(doc(db, 'users', user.uid, 'settings', 'data'), { notifyTiming: timing }, { merge: true });
+
+    const nextSet = new Set(notifyTimings);
+    if (nextSet.has(timing)) {
+      nextSet.delete(timing);
+    } else {
+      nextSet.add(timing);
     }
-    notify(`Avviso email impostato: ${timingLabels[timing]}`, 'success');
+    const updated = VALID_NOTIFY_TIMINGS.filter(t => nextSet.has(t));
+
+    setNotifyTimings(updated);
+    localStorage.setItem('pz8_notify_timings', JSON.stringify(updated));
+    if (user) {
+      await setDoc(
+        doc(db, 'users', user.uid, 'settings', 'data'),
+        { notifyTimings: updated, notifyTiming: updated[0] || 'none' },
+        { merge: true }
+      );
+    }
+    if (updated.length === 0) {
+      notify('Avvisi scadenza email disattivati', 'info');
+    } else {
+      notify(`Avvisi email attivi: ${updated.map(t => timingLabels[t]).join(' + ')}`, 'success');
+    }
   };
 
   // Auth Handlers
@@ -746,8 +787,8 @@ export default function App() {
         onToggleColumn={handleToggleColumn}
         tokenCost={tokenCost}
         onChangeTokenCost={handleChangeTokenCost}
-        notifyTiming={notifyTiming}
-        onChangeNotifyTiming={handleChangeNotifyTiming}
+        notifyTimings={notifyTimings}
+        onToggleNotifyTiming={handleToggleNotifyTiming}
         user={user}
         isAdmin={isAdmin}
       />

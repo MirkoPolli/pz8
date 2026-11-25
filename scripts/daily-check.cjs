@@ -169,17 +169,24 @@ async function run() {
         bodyLead: (userName) => `In scadenza TRA 2 GIORNI IPTV di "${userName}"\n`
       }
     };
-    const notifyTiming = timingConfig[settingsData.notifyTiming] ? settingsData.notifyTiming : 'today';
-    const activeTiming = timingConfig[notifyTiming];
-    console.log(`Preferenza invio notifica: ${activeTiming.label}`);
+    let notifyTimings;
+    if (Array.isArray(settingsData.notifyTimings)) {
+      notifyTimings = settingsData.notifyTimings.filter(t => Boolean(timingConfig[t]));
+    } else if (timingConfig[settingsData.notifyTiming]) {
+      notifyTimings = [settingsData.notifyTiming];
+    } else if (settingsData.notifyTiming === 'none') {
+      notifyTimings = [];
+    } else {
+      notifyTimings = ['today'];
+    }
+
+    const activeLabels = notifyTimings.map(t => timingConfig[t].label).join(' + ');
+    console.log(`Preferenze invio notifica: ${activeLabels || 'Disattivate (nessuna selezionata)'}`);
 
     // Leggi clienti dell'utente
     const clientsSnap = await db.collection('users').doc(uid).collection('clients').get();
-    const clientsToNotify = [];
+    const notificationsToSend = [];
     let expiringNext3Days = 0;
-
-    const targetDate = activeTiming.targetDate;
-    const targetStr = activeTiming.targetStr;
 
     clientsSnap.forEach(docSnap => {
       const c = docSnap.data();
@@ -188,9 +195,13 @@ async function run() {
       const exp = parseClientDateUtc(c.expirationDate);
       if (!exp) return;
 
-      // In scadenza oggi, domani o tra 2 giorni in base alla preferenza utente
-      if (c.expirationDate === targetStr || exp.getTime() === targetDate.getTime()) {
-        clientsToNotify.push(c);
+      // Controlla ogni fascia oraria attivata dall'utente
+      for (const timing of notifyTimings) {
+        const cfg = timingConfig[timing];
+        if (c.expirationDate === cfg.targetStr || exp.getTime() === cfg.targetDate.getTime()) {
+          notificationsToSend.push({ client: c, timing });
+          break;
+        }
       }
 
       // Conteggio in scadenza nei prossimi 3 giorni (da oggi a 3 giorni)
@@ -202,9 +213,10 @@ async function run() {
     let sentCount = 0;
 
     // 1. Invio Notifiche Scadenza
-    if (clientsToNotify.length > 0) {
-      console.log(`Trovati ${clientsToNotify.length} account da notificare (${notifyTiming}).`);
-      for (const client of clientsToNotify) {
+    if (notificationsToSend.length > 0) {
+      console.log(`Trovati ${notificationsToSend.length} account da notificare (${notifyTimings.join(', ')}).`);
+      for (const { client, timing } of notificationsToSend) {
+        const activeTiming = timingConfig[timing];
         const subject = `${activeTiming.subjectPrefix}: ${client.user}`;
 
         const emailBody = activeTiming.bodyLead(client.user) +
@@ -212,7 +224,7 @@ async function run() {
                           `Data scadenza: "${formatDateItalian(client.expirationDate)}"\n` +
                           `Costo mensile: "${client.monthlyCost || 10}€"`;
 
-        console.log(`Inviando notifica scadenza a ${recipientEmail} per "${client.user}"...`);
+        console.log(`Inviando notifica scadenza (${timing}) a ${recipientEmail} per "${client.user}"...`);
         try {
           const res = await resend.emails.send({
             from: 'PZ8 Manager <onboarding@resend.dev>',
@@ -231,7 +243,7 @@ async function run() {
         }
       }
     } else {
-      console.log(`Nessun account da notificare per ${recipientEmail} con criterio "${notifyTiming}".`);
+      console.log(`Nessun account da notificare per ${recipientEmail} con criteri "${notifyTimings.join(', ') || 'nessuno'}".`);
     }
 
     // 2. Alert Scorte Crediti Insufficienti (solo Admin)

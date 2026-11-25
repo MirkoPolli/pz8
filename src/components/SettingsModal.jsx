@@ -26,8 +26,8 @@ export default function SettingsModal({
   onToggleColumn,
   tokenCost = 3,
   onChangeTokenCost,
-  notifyTiming = 'today',
-  onChangeNotifyTiming,
+  notifyTimings = ['today'],
+  onToggleNotifyTiming,
   user,
   isAdmin = false
 }) {
@@ -256,64 +256,64 @@ export default function SettingsModal({
             </div>
 
             <p className="text-[11px] text-slate-400 leading-relaxed">
-              Scegli quando desideri ricevere la mail per gli account IPTV: il giorno stesso della scadenza, 1 giorno prima oppure 2 giorni prima.
+              Scegli quando ricevere l'email di promemoria. Puoi selezionare anche più opzioni contemporaneamente (es. 2 giorni prima + 1 giorno prima).
             </p>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
-              <button
-                type="button"
-                onClick={() => onChangeNotifyTiming('today')}
-                className={`p-3 rounded-xl border text-left transition-all ${
-                  notifyTiming === 'today'
-                    ? 'bg-[#00ff9d]/15 border-[#00ff9d] text-white shadow-[0_0_10px_rgba(0,255,157,0.2)]'
-                    : 'bg-[#121a2c] border-[#1f2d4d] text-slate-400 hover:text-white hover:bg-[#1a263f]'
-                }`}
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <span className="font-bold text-xs text-white">Giorno della scadenza</span>
-                  {notifyTiming === 'today' && <Check className="w-3.5 h-3.5 text-[#00ff9d]" />}
-                </div>
-                <p className="text-[10px] text-slate-400 leading-tight">
-                  Email inviata la mattina del giorno in cui scade l'utenza
-                </p>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => onChangeNotifyTiming('day_before')}
-                className={`p-3 rounded-xl border text-left transition-all ${
-                  notifyTiming === 'day_before'
-                    ? 'bg-[#00ff9d]/15 border-[#00ff9d] text-white shadow-[0_0_10px_rgba(0,255,157,0.2)]'
-                    : 'bg-[#121a2c] border-[#1f2d4d] text-slate-400 hover:text-white hover:bg-[#1a263f]'
-                }`}
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <span className="font-bold text-xs text-white">Il giorno prima (24h)</span>
-                  {notifyTiming === 'day_before' && <Check className="w-3.5 h-3.5 text-[#00ff9d]" />}
-                </div>
-                <p className="text-[10px] text-slate-400 leading-tight">
-                  Email inviata la mattina prima per preparare il rinnovo
-                </p>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => onChangeNotifyTiming('two_days_before')}
-                className={`p-3 rounded-xl border text-left transition-all ${
-                  notifyTiming === 'two_days_before'
-                    ? 'bg-[#00ff9d]/15 border-[#00ff9d] text-white shadow-[0_0_10px_rgba(0,255,157,0.2)]'
-                    : 'bg-[#121a2c] border-[#1f2d4d] text-slate-400 hover:text-white hover:bg-[#1a263f]'
-                }`}
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <span className="font-bold text-xs text-white">2 giorni prima (48h)</span>
-                  {notifyTiming === 'two_days_before' && <Check className="w-3.5 h-3.5 text-[#00ff9d]" />}
-                </div>
-                <p className="text-[10px] text-slate-400 leading-tight">
-                  Email inviata 2 giorni prima della scadenza
-                </p>
-              </button>
+              {[
+                {
+                  id: 'today',
+                  title: 'Giorno della scadenza',
+                  desc: "Email inviata la mattina del giorno in cui scade l'utenza"
+                },
+                {
+                  id: 'day_before',
+                  title: 'Il giorno prima (24h)',
+                  desc: 'Email inviata la mattina prima per preparare il rinnovo'
+                },
+                {
+                  id: 'two_days_before',
+                  title: '2 giorni prima (48h)',
+                  desc: 'Email inviata 2 giorni prima della scadenza'
+                }
+              ].map((opt) => {
+                const isSelected = notifyTimings.includes(opt.id);
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => onToggleNotifyTiming(opt.id)}
+                    className={`p-3 rounded-xl border text-left transition-all ${
+                      isSelected
+                        ? 'bg-[#00ff9d]/15 border-[#00ff9d] text-white shadow-[0_0_10px_rgba(0,255,157,0.2)]'
+                        : 'bg-[#121a2c] border-[#1f2d4d] text-slate-400 hover:text-white hover:bg-[#1a263f]'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <span className="font-bold text-xs text-white">{opt.title}</span>
+                      <span
+                        className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 border transition-colors ${
+                          isSelected
+                            ? 'bg-[#00ff9d] border-[#00ff9d] text-black'
+                            : 'bg-[#080c16] border-[#2c3f66] text-transparent'
+                        }`}
+                      >
+                        <Check className="w-3 h-3 stroke-[3]" />
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-slate-400 leading-tight">
+                      {opt.desc}
+                    </p>
+                  </button>
+                );
+              })}
             </div>
+
+            {notifyTimings.length === 0 && (
+              <div className="p-2.5 rounded-lg bg-[#ffb700]/10 border border-[#ffb700]/40 text-[11px] text-[#ffb700]">
+                Nessun promemoria selezionato: le email di scadenza sono disattivate.
+              </div>
+            )}
 
             <div className="p-2.5 rounded-lg bg-[#141b2b] border border-[#1e2a40] text-[11px] text-slate-300 flex items-start gap-2">
               <span className="text-[#00ff9d] font-bold">✓</span>
