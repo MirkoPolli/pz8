@@ -214,7 +214,7 @@ export default function UserModal({
                     Ultimo rinnovo: +{clientToEdit.lastRenewal.months} {clientToEdit.lastRenewal.months === 1 ? 'Mese' : 'Mesi'}
                   </div>
                   <div className="text-[11px] text-slate-400">
-                    Scadenza prec.: {formatDateItalian(clientToEdit.lastRenewal.prevExpirationDate)} • Vengono rimborsati +{clientToEdit.lastRenewal.months} CR
+                    Scadenza prec.: {formatDateItalian(clientToEdit.lastRenewal.prevExpirationDate)}{isAdmin ? ` • Vengono rimborsati +${clientToEdit.lastRenewal.months} CR` : ''}
                   </div>
                 </div>
               </div>
@@ -571,7 +571,7 @@ export default function UserModal({
               type="submit"
               className="px-5 py-2 rounded-lg bg-[#00ff9d] hover:bg-[#00dd87] text-black font-semibold text-xs transition-all shadow-[0_0_15px_rgba(0,255,157,0.3)]"
             >
-              {isEditing ? 'Salva Modifiche' : `Crea Utente (-${initialMonths} Crediti)`}
+              {isEditing ? 'Salva Modifiche' : 'Crea Utente'}
             </button>
           </div>
 
