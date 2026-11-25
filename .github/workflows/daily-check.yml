@@ -1,10 +1,13 @@
 name: Daily Expiration Check & Email
 
 on:
-  schedule:
-    # 07:15 UTC = 08:15 CET (usiamo minuto 15 e anticipiamo per evitare le code del minuto :00)
-    - cron: '15 7 * * *'
   workflow_dispatch:
+    inputs:
+      force_resend:
+        description: 'Forza invio anche se già inviato oggi (solo per test)'
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   check-and-notify:
@@ -25,4 +28,5 @@ jobs:
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          FORCE_RESEND: ${{ inputs.force_resend || 'false' }}
         run: node scripts/daily-check.cjs

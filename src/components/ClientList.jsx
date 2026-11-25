@@ -100,8 +100,41 @@ export default function ClientList({
     if (!debtor.telegram && c.telegram) debtor.telegram = c.telegram;
   });
 
-  const uniqueDebtors = Array.from(debtorsMap.values()).sort((a, b) => b.totalDue - a.totalDue);
+  const uniqueDebtors = Array.from(debtorsMap.values())
+    .map(debtor => ({
+      ...debtor,
+      accounts: [...debtor.accounts].sort((a, b) => (a.user || '').localeCompare(b.user || ''))
+    }))
+    .sort((a, b) => b.totalDue - a.totalDue);
   const uniqueDebtorsCount = uniqueDebtors.length;
+
+  // Filtro ricerca applicato ai debitori nella vista "Da Saldare"
+  const searchQuery = search.trim().toLowerCase();
+  const filteredDebtors = !searchQuery
+    ? uniqueDebtors
+    : uniqueDebtors
+        .map((debtor) => {
+          const personMatches =
+            (debtor.name || '').toLowerCase().includes(searchQuery) ||
+            (debtor.phone || '').toLowerCase().includes(searchQuery) ||
+            (debtor.telegram || '').toLowerCase().includes(searchQuery);
+          if (personMatches) return debtor;
+          const matchingAccounts = debtor.accounts.filter((acc) =>
+            (acc.user || '').toLowerCase().includes(searchQuery)
+          );
+          if (matchingAccounts.length > 0) {
+            return {
+              ...debtor,
+              accounts: matchingAccounts,
+              totalDue: matchingAccounts.reduce((sum, a) => sum + a.amountDue, 0),
+            };
+          }
+          return null;
+        })
+        .filter(Boolean);
+
+  const filteredTotalDue = filteredDebtors.reduce((sum, d) => sum + d.totalDue, 0);
+  const filteredUnpaidAccountsCount = filteredDebtors.reduce((sum, d) => sum + d.accounts.length, 0);
 
   // Filter clients
   const filteredClients = clients.filter(c => {
@@ -170,19 +203,19 @@ export default function ClientList({
           )}
         </div>
 
-        {/* Filter Tabs: Solo Attivi come default, In Scadenza, Scaduti, Da Saldare, Disattivati (Rimosso 'Tutti') */}
+        {/* Filter Tabs: Attivi, In Scadenza, Scaduti, Disattivati, Da Saldare in fondo */}
         <div className="flex items-center gap-1 overflow-x-auto pb-1 md:pb-0 text-xs font-mono">
           {[
             { id: 'active', label: 'Attivi' },
             { id: 'expiring', label: 'In Scadenza (≤3gg)', highlight: true },
             { id: 'expired', label: 'Scaduti' },
+            { id: 'inactive', label: 'Disattivati' },
             { 
               id: 'unpaid', 
               label: `Da Saldare (€${totalAmountDue})`, 
               isRed: totalAmountDue > 0, 
               badge: uniqueDebtorsCount 
             },
-            { id: 'inactive', label: 'Disattivati' },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -208,7 +241,13 @@ export default function ClientList({
 
       {/* Counter - Totale da riscuotere calcolato in base al contatto unico */}
       <div className="flex items-center justify-between text-xs font-mono text-slate-400 px-1">
-        <span>Risultati visualizzati: <strong className="text-white">{sortedClients.length}</strong></span>
+        {filterTab === 'unpaid' ? (
+          <span>
+            Risultati visualizzati: <strong className="text-white">{filteredDebtors.length}</strong> {filteredDebtors.length === 1 ? 'persona' : 'persone'} ({filteredUnpaidAccountsCount} account)
+          </span>
+        ) : (
+          <span>Risultati visualizzati: <strong className="text-white">{sortedClients.length}</strong></span>
+        )}
         {totalAmountDue > 0 && (
           <span className="text-[#ff6b8b]">
             Totale da riscuotere: <strong className="text-[#ff3366]">€{totalAmountDue}</strong> ({uniqueDebtorsCount} {uniqueDebtorsCount === 1 ? 'cliente' : 'clienti'})
@@ -216,107 +255,148 @@ export default function ClientList({
         )}
       </div>
 
-      {/* --- SEZIONE DA SALDARE: RIEPILOGO PERSONE CON TOTALI --- */}
-      {filterTab === 'unpaid' && uniqueDebtors.length > 0 && (
-        <div className="p-4 rounded-xl bg-[#120d18] border border-[#ff3366]/40 shadow-xl space-y-3">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-[#ff3366]/20">
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#ff3366] animate-pulse"></span>
-              <h3 className="font-mono font-bold text-sm text-white uppercase tracking-wider flex items-center gap-2">
-                <span>Riepilogo Debitori per Persona</span>
-                <span className="px-2 py-0.5 rounded-full text-xs bg-[#ff3366]/20 text-[#ff6b8b] border border-[#ff3366]/40">
-                  {uniqueDebtorsCount} {uniqueDebtorsCount === 1 ? 'persona' : 'persone'}
-                </span>
-              </h3>
+      {/* --- SEZIONE DA SALDARE: SOLO RIEPILOGO PERSONE CON TOTALI E SALDO PER SINGOLO ACCOUNT --- */}
+      {filterTab === 'unpaid' && (
+        unpaidClients.length === 0 ? (
+          <div className="p-8 rounded-xl bg-[#0d121f] border border-[#00ff9d]/30 text-center space-y-2">
+            <CheckCircle2 className="w-8 h-8 text-[#00ff9d] mx-auto" />
+            <div className="font-mono font-bold text-sm text-white">
+              Nessun pagamento in sospeso
             </div>
-            <div className="text-left sm:text-right">
-              <span className="text-xs text-slate-400 font-mono">Totale complessivo: </span>
-              <strong className="text-base text-[#ff3366] font-mono font-bold">€{totalAmountDue}</strong>
-            </div>
+            <p className="font-mono text-xs text-slate-400">
+              Tutti gli account risultano saldati e in regola.
+            </p>
           </div>
+        ) : filteredDebtors.length === 0 ? (
+          <div className="p-8 rounded-xl bg-[#0d121f] border border-[#1b253b] text-center font-mono text-xs text-slate-400">
+            Nessun debitore trovato per "<span className="text-white">{search}</span>".
+          </div>
+        ) : (
+          <div className="p-4 rounded-xl bg-[#120d18] border border-[#ff3366]/40 shadow-xl space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-[#ff3366]/20">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-[#ff3366] animate-pulse"></span>
+                <h3 className="font-mono font-bold text-sm text-white uppercase tracking-wider flex items-center gap-2">
+                  <span>Riepilogo Debitori per Persona</span>
+                  <span className="px-2 py-0.5 rounded-full text-xs bg-[#ff3366]/20 text-[#ff6b8b] border border-[#ff3366]/40">
+                    {filteredDebtors.length} {filteredDebtors.length === 1 ? 'persona' : 'persone'}
+                  </span>
+                </h3>
+              </div>
+              <div className="text-left sm:text-right">
+                <span className="text-xs text-slate-400 font-mono">Totale {searchQuery ? 'filtrato' : 'complessivo'}: </span>
+                <strong className="text-base text-[#ff3366] font-mono font-bold">€{filteredTotalDue}</strong>
+              </div>
+            </div>
 
-          {/* Griglia card per persona con totali ed elenco account */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-            {uniqueDebtors.map((debtor) => {
-              const waUrl = getWhatsAppUrl(debtor.phone);
-              const tgUrl = getTelegramUrl(debtor.telegram);
+            {/* Griglia card per persona con totali ed elenco account saldabili singolarmente */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+              {filteredDebtors.map((debtor) => {
+                const waUrl = getWhatsAppUrl(debtor.phone);
+                const tgUrl = getTelegramUrl(debtor.telegram);
 
-              return (
-                <div 
-                  key={debtor.key}
-                  className="p-3 rounded-lg bg-[#0a070e] border border-[#ff3366]/25 hover:border-[#ff3366]/50 transition-all flex flex-col justify-between"
-                >
-                  <div>
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <div className="min-w-0">
-                        <span className="font-bold text-white text-xs truncate block" title={debtor.name}>
-                          {debtor.name}
-                        </span>
-                        {debtor.phone && (
-                          <span className="text-[10px] text-slate-400 font-mono">
-                            {debtor.phone}
+                return (
+                  <div 
+                    key={debtor.key}
+                    className="p-3 rounded-lg bg-[#0a070e] border border-[#ff3366]/25 hover:border-[#ff3366]/50 transition-all flex flex-col justify-between"
+                  >
+                    <div>
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <div className="min-w-0">
+                          <span className="font-bold text-white text-xs truncate block" title={debtor.name}>
+                            {debtor.name}
                           </span>
+                          {debtor.phone && (
+                            <span className="text-[10px] text-slate-400 font-mono">
+                              {debtor.phone}
+                            </span>
+                          )}
+                        </div>
+                        <span className="px-2 py-0.5 rounded text-xs font-mono font-bold bg-[#ff3366]/20 text-[#ff3366] border border-[#ff3366]/50 flex-shrink-0">
+                          €{debtor.totalDue}
+                        </span>
+                      </div>
+
+                      {/* Elenco account associati a questa persona */}
+                      <div className="space-y-1.5 mb-2.5">
+                        {debtor.accounts.map((acc) => (
+                          <div key={acc.id} className="flex items-center justify-between gap-2 text-[11px] font-mono text-slate-300 bg-[#160e1d] px-2 py-1.5 rounded border border-[#2d1b33]">
+                            <div className="min-w-0 flex-1">
+                              <span className="truncate block text-slate-200 font-semibold" title={acc.user}>
+                                📺 {acc.user}
+                              </span>
+                              {acc.rawClient?.paymentNote && (
+                                <span className="block text-[10px] text-slate-400 truncate" title={acc.rawClient.paymentNote}>
+                                  {acc.rawClient.paymentNote}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1.5 flex-shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => onOpenPaymentModal(acc.rawClient)}
+                                className="px-1.5 py-0.5 rounded bg-[#ff3366]/15 hover:bg-[#ff3366]/30 border border-[#ff3366]/40 text-[#ff6b8b] font-bold text-[11px] transition-colors"
+                                title="Modifica importo o saldo parziale"
+                              >
+                                €{acc.amountDue}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => onQuickPay(acc.rawClient)}
+                                className="px-2 py-0.5 rounded bg-[#00ff9d]/20 hover:bg-[#00ff9d] text-[#00ff9d] hover:text-black border border-[#00ff9d]/40 font-bold text-[10px] flex items-center gap-1 transition-all"
+                                title={`Segna "${acc.user}" (€${acc.amountDue}) come saldato`}
+                              >
+                                <Check className="w-3 h-3" />
+                                <span>Salda</span>
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Azioni rapide di contatto */}
+                    <div className="flex items-center justify-between pt-2 border-t border-[#2d1b33] text-[11px]">
+                      <span className="text-slate-500 font-mono text-[10px]">
+                        {debtor.accounts.length} {debtor.accounts.length === 1 ? 'account' : 'account'}
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        {waUrl && (
+                          <a
+                            href={waUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="p-1 px-2 rounded bg-[#25D366]/10 text-[#25D366] hover:bg-[#25D366]/20 border border-[#25D366]/30 transition-colors flex items-center gap-1 font-bold text-[10px]"
+                            title="Scrivi su WhatsApp (ciao scade oggi)"
+                          >
+                            <MessageCircle className="w-3 h-3" />
+                            <span>WhatsApp</span>
+                          </a>
+                        )}
+                        {tgUrl && (
+                          <a
+                            href={tgUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="p-1 px-2 rounded bg-[#0088cc]/10 text-[#0088cc] hover:bg-[#0088cc]/20 border border-[#0088cc]/30 transition-colors flex items-center gap-1 font-bold text-[10px]"
+                            title="Scrivi su Telegram"
+                          >
+                            <Send className="w-3 h-3" />
+                            <span>TG</span>
+                          </a>
                         )}
                       </div>
-                      <span className="px-2 py-0.5 rounded text-xs font-mono font-bold bg-[#ff3366]/20 text-[#ff3366] border border-[#ff3366]/50 flex-shrink-0">
-                        €{debtor.totalDue}
-                      </span>
-                    </div>
-
-                    {/* Elenco account associati a questa persona */}
-                    <div className="space-y-1 mb-2.5">
-                      {debtor.accounts.map((acc, idx) => (
-                        <div key={idx} className="flex items-center justify-between text-[11px] font-mono text-slate-300 bg-[#160e1d] px-2 py-1 rounded border border-[#2d1b33]">
-                          <span className="truncate max-w-[140px] text-slate-200">
-                            📺 {acc.user}
-                          </span>
-                          <span className="text-[#ff6b8b] font-bold">
-                            €{acc.amountDue}
-                          </span>
-                        </div>
-                      ))}
                     </div>
                   </div>
-
-                  {/* Azioni rapide di contatto */}
-                  <div className="flex items-center justify-between pt-2 border-t border-[#2d1b33] text-[11px]">
-                    <span className="text-slate-500 font-mono text-[10px]">
-                      {debtor.accounts.length} {debtor.accounts.length === 1 ? 'account' : 'account'}
-                    </span>
-                    <div className="flex items-center gap-1.5">
-                      {waUrl && (
-                        <a
-                          href={waUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="p-1 px-2 rounded bg-[#25D366]/10 text-[#25D366] hover:bg-[#25D366]/20 border border-[#25D366]/30 transition-colors flex items-center gap-1 font-bold text-[10px]"
-                          title="Scrivi su WhatsApp (ciao scade oggi)"
-                        >
-                          <MessageCircle className="w-3 h-3" />
-                          <span>WhatsApp</span>
-                        </a>
-                      )}
-                      {tgUrl && (
-                        <a
-                          href={tgUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="p-1 px-2 rounded bg-[#0088cc]/10 text-[#0088cc] hover:bg-[#0088cc]/20 border border-[#0088cc]/30 transition-colors flex items-center gap-1 font-bold text-[10px]"
-                          title="Scrivi su Telegram"
-                        >
-                          <Send className="w-3 h-3" />
-                          <span>TG</span>
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
-        </div>
+        )
       )}
 
+      {filterTab !== 'unpaid' && (
+        <>
       {/* --- DESKTOP TABLE VIEW --- */}
       <div className="hidden md:block rounded-xl border border-[#1b253b] bg-[#0d121f] overflow-hidden">
         <table className="w-full text-left text-xs font-mono">
@@ -772,6 +852,8 @@ export default function ClientList({
           })
         )}
       </div>
+        </>
+      )}
 
     </div>
   );

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Header from './components/Header';
 import StatsBar from './components/StatsBar';
 import ClientList from './components/ClientList';
@@ -27,7 +27,7 @@ import {
 } from './firebase';
 
 import { INITIAL_CREDIT_STATE } from './data/sampleClients';
-import { addMonthsToDate, getTodayDateString } from './utils/dateUtils';
+import { addMonthsToDate, getTodayDateString, formatDateItalian } from './utils/dateUtils';
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -56,6 +56,7 @@ export default function App() {
   });
 
   const [notification, setNotification] = useState(null);
+  const notifyTimerRef = useRef(null);
 
   // Admin access control (Mirko Polliotto)
   const ADMIN_EMAILS = ['polliotto.mirko@gmail.com'];
@@ -94,8 +95,14 @@ export default function App() {
 
   // Show temporary toast notification (with optional action button)
   const notify = (msg, type = 'info', action = null) => {
+    if (notifyTimerRef.current) {
+      clearTimeout(notifyTimerRef.current);
+    }
     setNotification({ msg, type, action });
-    setTimeout(() => setNotification(null), 4000);
+    notifyTimerRef.current = setTimeout(() => {
+      setNotification(null);
+      notifyTimerRef.current = null;
+    }, 5000);
   };
 
   // 1. Listen for Firebase Auth state changes
@@ -337,7 +344,7 @@ export default function App() {
         if (deductCredits > 0) {
           handleDeductCredits(deductCredits, `Nuovo utente "${clientFields.user}" (${deductCredits}M)`);
         }
-        notify(`Nuovo utente "${clientFields.user}" creato (-${deductCredits} crediti).`, 'success');
+        notify(`Nuovo utente "${clientFields.user}" creato${deductCredits > 0 ? ` (-${deductCredits} crediti)` : ''}.`, 'success');
       }
 
       // Salva o aggiorna automaticamente il contatto nella Rubrica
@@ -356,7 +363,7 @@ export default function App() {
 
   // Renewal Flow: 1. Request Confirmation Modal
   const handleRequestRenew = (client, months) => {
-    if (creditData.creditsBalance < months) {
+    if (isAdmin && creditData.creditsBalance < months) {
       notify(`Crediti insufficienti! Servono ${months} crediti. Ricarica prima!`, 'error');
       setIsCreditModalOpen(true);
       return;
@@ -444,9 +451,13 @@ export default function App() {
       }, { merge: true });
     }
 
-    // Refund credits
-    handleAddCredits(months, 0, `Rimborso annullamento rinnovo per "${client.user}" (+${months}M)`);
-    notify(`Rinnovo annullato! Data ripristinata e rimborsati +${months} crediti.`, 'info');
+    // Refund credits (solo admin)
+    if (isAdmin) {
+      handleAddCredits(months, 0, `Rimborso annullamento rinnovo per "${client.user}" (+${months}M)`);
+      notify(`Rinnovo annullato! Data ripristinata e rimborsati +${months} crediti.`, 'info');
+    } else {
+      notify(`Rinnovo annullato! Data ripristinata.`, 'info');
+    }
   };
 
   // Save / Update Payment status
@@ -460,15 +471,37 @@ export default function App() {
     }
   };
 
+  // Undo Quick Pay: ripristina debito precedente
+  const handleUndoQuickPay = async (prevSnapshot) => {
+    if (!user || !prevSnapshot) return;
+    await setDoc(doc(db, 'users', user.uid, 'clients', prevSnapshot.id), {
+      paymentStatus: prevSnapshot.paymentStatus,
+      amountDue: prevSnapshot.amountDue,
+      paymentNote: prevSnapshot.paymentNote
+    }, { merge: true });
+    notify(`Saldo annullato: ripristinato €${prevSnapshot.amountDue} da saldare per "${prevSnapshot.user}".`, 'info');
+  };
+
   // Quick Pay (1-click mark as paid)
   const handleQuickPay = async (client) => {
     if (!user) return;
+    const prevSnapshot = {
+      id: client.id,
+      user: client.user,
+      paymentStatus: client.paymentStatus || 'unpaid',
+      amountDue: Number(client.amountDue) || 0,
+      paymentNote: client.paymentNote || ''
+    };
     await setDoc(doc(db, 'users', user.uid, 'clients', client.id), {
       paymentStatus: 'paid',
       amountDue: 0,
       paymentNote: ''
     }, { merge: true });
-    notify(`Pagamento di €${client.amountDue || 0} per "${client.user}" incassato con successo!`, 'success');
+    notify(
+      `Pagamento di €${prevSnapshot.amountDue} per "${client.user}" incassato!`,
+      'success',
+      { label: 'Annulla', onClick: () => handleUndoQuickPay(prevSnapshot) }
+    );
   };
 
   // Toggle Client Active
@@ -711,6 +744,7 @@ export default function App() {
         notifyTiming={notifyTiming}
         onChangeNotifyTiming={handleChangeNotifyTiming}
         user={user}
+        isAdmin={isAdmin}
       />
 
       <ConfirmRenewModal

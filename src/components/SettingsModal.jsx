@@ -13,9 +13,11 @@ import {
   RotateCw, 
   Smartphone,
   Mail,
-  Bell
+  Bell,
+  FileCode
 } from 'lucide-react';
 import { forceReloadApp } from '../utils/reloadApp';
+import AppsScriptModal from './AppsScriptModal';
 
 export default function SettingsModal({
   isOpen,
@@ -26,11 +28,13 @@ export default function SettingsModal({
   onChangeTokenCost,
   notifyTiming = 'today',
   onChangeNotifyTiming,
-  user
+  user,
+  isAdmin = false
 }) {
   const [costInput, setCostInput] = useState(tokenCost);
   const [isReloading, setIsReloading] = useState(false);
   const [savedCostNotice, setSavedCostNotice] = useState(false);
+  const [isAppsScriptOpen, setIsAppsScriptOpen] = useState(false);
 
   if (!isOpen) return null;
 
@@ -109,6 +113,7 @@ export default function SettingsModal({
   ];
 
   return (
+    <>
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm">
       <div className="bg-[#111726] border border-[#1f2a45] rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col max-h-[92vh]">
         
@@ -298,6 +303,17 @@ export default function SettingsModal({
                 <strong>Alert Crediti Insufficienti:</strong> Se il tuo saldo crediti non è sufficiente per rinnovare gli utenti in scadenza nei prossimi 3 giorni, riceverai automaticamente un'email di avviso per ricaricare le scorte.
               </span>
             </div>
+
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={() => setIsAppsScriptOpen(true)}
+                className="w-full py-2 px-3 rounded-xl bg-[#121c30] hover:bg-[#192845] border border-[#00f0ff]/40 text-[#00f0ff] font-bold flex items-center justify-center gap-2 transition-all text-[11px]"
+              >
+                <FileCode className="w-3.5 h-3.5" />
+                <span>Configura Trigger 09:00 (Google Apps Script)</span>
+              </button>
+            )}
           </div>
 
           {/* Sezione 4: Visibilità Colonne */}
@@ -374,5 +390,13 @@ export default function SettingsModal({
 
       </div>
     </div>
+
+    {isAdmin && (
+      <AppsScriptModal
+        isOpen={isAppsScriptOpen}
+        onClose={() => setIsAppsScriptOpen(false)}
+      />
+    )}
+    </>
   );
 }

@@ -1,98 +1,94 @@
 import React, { useState } from 'react';
-import { X, Copy, Check, FileCode, Clock, Mail, ShieldAlert, ExternalLink } from 'lucide-react';
+import { X, Copy, Check, FileCode, Clock } from 'lucide-react';
 
-export default function AppsScriptModal({ isOpen, onClose, userEmail }) {
+export default function AppsScriptModal({ isOpen, onClose }) {
   const [copied, setCopied] = useState(false);
 
   if (!isOpen) return null;
 
-  const targetEmail = userEmail || "tua_email_google@gmail.com";
-
   const scriptCode = `/**
- * PZ8 IPTV MANAGER - AUTOMAZIONE EMAIL SCADENZE & CREDITI
- * Da incollare in Google Apps Script (Estensioni > Apps Script nel tuo foglio Google)
- * 
- * Istruzioni:
- * 1. Incolla questo codice nell'editor Apps Script.
- * 2. Clicca sull'icona della Sveglia (Trigger) a sinistra.
- * 3. Aggiungi trigger: funzione "inviaNotificheGiornaliereIPTV", sorgente "Orario",
- *    frequenza "Giornaliera", intervallo "Dalle 8:00 alle 9:00" (o 9:00 - 10:00).
+ * PZ8 MANAGER - TRIGGER GIORNALIERO EMAIL SCADENZE (Google Apps Script)
+ * Avvia ogni mattina intorno alle 09:00 (Europe/Rome) il workflow GitHub Actions
+ * "daily-check.yml" (Firebase + Resend), evitando i ritardi dello scheduler GitHub.
  */
 
-function inviaNotificheGiornaliereIPTV() {
-  var EMAIL_DESTINATARIO = "${targetEmail}";
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getActiveSheet(); // o ss.getSheetByName("Foglio1");
-  var data = sheet.getDataRange().getValues();
-  
-  var oggi = new Date();
-  oggi.setHours(0, 0, 0, 0);
-  
-  var treGiorni = new Date(oggi);
-  treGiorni.setDate(oggi.getDate() + 3);
+var GITHUB_OWNER = 'MirkoPolli';
+var GITHUB_REPO = 'pz8';
+var WORKFLOW_FILE = 'daily-check.yml';
+var GITHUB_BRANCH = 'main';
+var GITHUB_TOKEN = 'INCOLLA_QUI_IL_TUO_GITHUB_TOKEN';
 
-  var utentiScadutiOggi = [];
-  var utentiInScadenzaProssimi3gg = 0;
+function avviaControlloScadenzePZ8() {
+  avviaWorkflow_(false);
+}
 
-  // Riga 1 contiene intestazioni o totali, i dati partono dalla riga 2 (indice 1)
-  for (var i = 1; i < data.length; i++) {
-    var row = data[i];
-    var username = row[0]; // Colonna A: Username
-    var contatto = row[1]; // Colonna B: Contatto
-    var enabled  = row[2]; // Colonna C: Enabled ('x' o attivo)
-    var scadenza = row[3]; // Colonna D: Data scadenza
-    var costo    = row[4]; // Colonna E: Costo mensile
+function testaInvioOra() {
+  avviaWorkflow_(true);
+}
 
-    // Considera solo account attivi
-    var isAttivo = (enabled === 'x' || enabled === true || enabled === 'X' || enabled === 1);
-    if (!isAttivo || !scadenza || !username) continue;
+function installaTriggerGiornaliero() {
+  rimuoviTriggerGiornaliero();
 
-    var dataScadenza = new Date(scadenza);
-    dataScadenza.setHours(0, 0, 0, 0);
+  ScriptApp.newTrigger('avviaControlloScadenzePZ8')
+    .timeBased()
+    .everyDays(1)
+    .atHour(9)
+    .nearMinute(0)
+    .inTimezone('Europe/Rome')
+    .create();
 
-    // Controlla se scade esattamente oggi
-    if (dataScadenza.getTime() === oggi.getTime()) {
-      utentiScadutiOggi.push({
-        user: username,
-        contatto: contatto || "N/D",
-        costo: costo || 10
-      });
-    }
+  Logger.log('✓ Trigger giornaliero installato: esecuzione prevista ogni giorno alle ~09:00 (Europe/Rome).');
+}
 
-    // Controlla se scade entro i prossimi 3 giorni
-    if (dataScadenza >= oggi && dataScadenza <= treGiorni) {
-      utentiInScadenzaProssimi3gg++;
+function rimuoviTriggerGiornaliero() {
+  var triggers = ScriptApp.getProjectTriggers();
+  var removed = 0;
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === 'avviaControlloScadenzePZ8') {
+      ScriptApp.deleteTrigger(triggers[i]);
+      removed++;
     }
   }
+  if (removed > 0) {
+    Logger.log('Rimossi ' + removed + ' trigger precedenti.');
+  }
+}
 
-  // 1. INVIO EMAIL SCADENZE DI OGGI
-  if (utentiScadutiOggi.length > 0) {
-    for (var j = 0; j < utentiScadutiOggi.length; j++) {
-      var u = utentiScadutiOggi[j];
-      var subject = "Scadenza IPTV";
-      var body = 'Scaduto oggi IPTV di "' + u.user + '"\\n' +
-                 'Nome contatto: "' + u.contatto + '"\\n' +
-                 'Costo mensile: "' + u.costo + '€"';
-      
-      GmailApp.sendEmail(EMAIL_DESTINATARIO, subject, body);
-      Logger.log("Email scadenza inviata per: " + u.user);
-    }
+function avviaWorkflow_(forceResend) {
+  if (!GITHUB_TOKEN || GITHUB_TOKEN === 'INCOLLA_QUI_IL_TUO_GITHUB_TOKEN') {
+    throw new Error('Devi prima inserire il tuo GITHUB_TOKEN in cima allo script.');
   }
 
-  // 2. CONTROLLO E ALERT CREDITI IN ESAURIMENTO
-  // Legge i crediti disponibili dalla cella G1 (o formula crediti residui)
-  var creditiDisponibili = sheet.getRange("G1").getValue() || 0;
-  var fabbisognoStimato = utentiInScadenzaProssimi3gg * 3; // 3 mesi medi per rinnovo
+  var url = 'https://api.github.com/repos/' + GITHUB_OWNER + '/' + GITHUB_REPO +
+            '/actions/workflows/' + WORKFLOW_FILE + '/dispatches';
 
-  if (creditiDisponibili < fabbisognoStimato && utentiInScadenzaProssimi3gg > 0) {
-    var subjectAlert = "⚠️ Alert Crediti IPTV in Esaurimento";
-    var bodyAlert = "Attenzione,\\n\\n" +
-                    "I tuoi crediti disponibili sono quasi esauriti: " + creditiDisponibili + " CR rimanenti.\\n" +
-                    "Hai " + utentiInScadenzaProssimi3gg + " utenti in scadenza nei prossimi 3 giorni (fabbisogno stimato: " + fabbisognoStimato + " crediti).\\n\\n" +
-                    "Ricordati di ricaricare il pacchetto crediti!";
-    
-    GmailApp.sendEmail(EMAIL_DESTINATARIO, subjectAlert, bodyAlert);
-    Logger.log("Alert crediti inviato: " + creditiDisponibili + " rimasti.");
+  var payload = {
+    ref: GITHUB_BRANCH,
+    inputs: {
+      force_resend: forceResend ? 'true' : 'false'
+    }
+  };
+
+  var options = {
+    method: 'post',
+    contentType: 'application/json',
+    headers: {
+      Authorization: 'Bearer ' + GITHUB_TOKEN,
+      Accept: 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2022-11-28',
+      'User-Agent': 'PZ8-AppsScript-Trigger'
+    },
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true
+  };
+
+  var response = UrlFetchApp.fetch(url, options);
+  var code = response.getResponseCode();
+
+  if (code === 204) {
+    Logger.log('✓ Workflow "' + WORKFLOW_FILE + '" avviato con successo (force_resend=' + payload.inputs.force_resend + ').');
+  } else {
+    throw new Error('Errore avvio workflow GitHub (HTTP ' + code + '): ' + response.getContentText());
   }
 }
 `;
@@ -104,7 +100,7 @@ function inviaNotificheGiornaliereIPTV() {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
       <div className="bg-[#111726] border border-[#1f2a45] rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden shadow-2xl">
         
         {/* Header */}
@@ -112,10 +108,11 @@ function inviaNotificheGiornaliereIPTV() {
           <div className="flex items-center gap-2">
             <FileCode className="w-5 h-5 text-[#00f0ff]" />
             <h2 className="font-mono font-bold text-white text-base">
-              Automazione Email (Google Apps Script)
+              Trigger Email 09:00 (Google Apps Script → Resend)
             </h2>
           </div>
           <button 
+            type="button"
             onClick={onClose}
             className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
           >
@@ -126,24 +123,26 @@ function inviaNotificheGiornaliereIPTV() {
         {/* Content */}
         <div className="p-5 overflow-y-auto space-y-4 text-xs font-mono">
           
-          <div className="p-3 rounded-xl bg-[#0a0d14] border border-[#1d273d] space-y-2 text-slate-300">
+          <div className="p-3.5 rounded-xl bg-[#0a0d14] border border-[#1d273d] space-y-2 text-slate-300">
             <div className="font-bold text-[#00ff9d] flex items-center gap-1.5">
               <Clock className="w-4 h-4" />
-              <span>Come attivare l'invio automatico alle ore 09:00:</span>
+              <span>Configurazione in 6 passi per ricevere le email puntuali alle ~09:00:</span>
             </div>
-            <ol className="list-decimal list-inside space-y-1 text-slate-400">
-              <li>Apri il tuo foglio Google Sheets <strong className="text-white">IPTV</strong>.</li>
-              <li>Dal menu in alto clicca su <strong className="text-white">Estensioni &gt; Apps Script</strong>.</li>
-              <li>Cancella il contenuto esistente e incolla il codice qui sotto.</li>
-              <li>Clicca sull'icona della sveglia <strong className="text-white">Trigger</strong> nel menu laterale a sinistra di Apps Script.</li>
-              <li>Aggiungi un trigger: seleziona <strong className="text-white">inviaNotificheGiornaliereIPTV</strong>, evento <strong className="text-white">Guidato da data e ora</strong>, ogni giorno, intervallo <strong className="text-white">8:00 - 9:00</strong>.</li>
+            <ol className="list-decimal list-inside space-y-1.5 text-slate-400 leading-relaxed">
+              <li>Apri <strong className="text-white">script.google.com</strong> con il tuo account Google e clicca <strong className="text-white">Nuovo progetto</strong>.</li>
+              <li>Cancella il testo iniziale e incolla tutto il codice qui sotto.</li>
+              <li>Sostituisci <strong className="text-[#ffb700]">INCOLLA_QUI_IL_TUO_GITHUB_TOKEN</strong> con il tuo token GitHub (permesso <em>Actions: Read and write</em> su <strong className="text-white">MirkoPolli/pz8</strong>).</li>
+              <li>Salva il progetto (<strong className="text-white">Cmd+S / Ctrl+S</strong>).</li>
+              <li>Dal menu in alto seleziona <strong className="text-white">installaTriggerGiornaliero</strong>, clicca <strong className="text-white">Esegui</strong> e accetta le autorizzazioni Google richieste.</li>
+              <li>Facoltativo: per fare un test immediato seleziona <strong className="text-white">testaInvioOra</strong> e clicca <strong className="text-white">Esegui</strong>.</li>
             </ol>
           </div>
 
           <div className="relative">
             <div className="flex items-center justify-between pb-2">
-              <span className="text-slate-400 uppercase text-[11px]">Codice Apps Script Pronto:</span>
+              <span className="text-slate-400 uppercase text-[11px]">Codice Google Apps Script:</span>
               <button
+                type="button"
                 onClick={handleCopy}
                 className="flex items-center gap-1 px-3 py-1 rounded bg-[#1e2c4a] hover:bg-[#25375c] border border-[#00f0ff]/40 text-[#00f0ff] transition-all"
               >
@@ -162,6 +161,7 @@ function inviaNotificheGiornaliereIPTV() {
         {/* Footer */}
         <div className="px-5 py-3 border-t border-[#1f2a45] bg-[#0e1320] flex justify-end">
           <button
+            type="button"
             onClick={onClose}
             className="px-4 py-2 rounded-lg bg-[#151c2e] text-slate-300 hover:text-white font-mono text-xs"
           >

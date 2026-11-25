@@ -1,8 +1,8 @@
 /**
  * scripts/daily-check.cjs
- * Eseguito su GitHub Actions ogni giorno alle ore 09:00 (CET).
+ * Avviato tramite workflow_dispatch (es. da Google Apps Script ogni giorno alle ~09:00 Europe/Rome).
  * Notifica gli utenti via email per i rispettivi account in scadenza (oggi o il giorno prima, in base alle impostazioni)
- * e invia un alert se i crediti disponibili non bastano per i rinnovi imminenti.
+ * e invia un alert all'admin se i crediti disponibili non bastano per i rinnovi imminenti.
  */
 
 const admin = require('firebase-admin');
@@ -28,36 +28,63 @@ admin.initializeApp({
 
 const db = admin.firestore();
 
-function getRomeDate(offsetDays = 0) {
-  const d = new Date();
-  if (offsetDays !== 0) {
-    d.setDate(d.getDate() + offsetDays);
+const ADMIN_EMAILS = ['polliotto.mirko@gmail.com'];
+const forceResend = String(process.env.FORCE_RESEND || 'false').toLowerCase() === 'true';
+
+function getRomeTodayParts() {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Rome',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(new Date());
+
+  const map = {};
+  for (const part of parts) {
+    if (part.type !== 'literal') {
+      map[part.type] = Number(part.value);
+    }
   }
-  const itDateStr = d.toLocaleDateString('it-IT', { timeZone: 'Europe/Rome' });
-  const [day, m, y] = itDateStr.split('/');
-  return new Date(`${y}-${m.padStart(2, '0')}-${day.padStart(2, '0')}T00:00:00`);
+  return { year: map.year, month: map.month, day: map.day };
 }
 
-function getTodayString() {
-  const d = new Date();
-  const itDateStr = d.toLocaleDateString('it-IT', { timeZone: 'Europe/Rome' });
-  const [day, m, y] = itDateStr.split('/');
-  return `${y}-${m.padStart(2, '0')}-${day.padStart(2, '0')}`;
+function getRomeUtcDate(offsetDays = 0) {
+  const { year, month, day } = getRomeTodayParts();
+  return new Date(Date.UTC(year, month - 1, day + offsetDays));
 }
 
-function getTomorrowString() {
-  const d = new Date();
-  d.setDate(d.getDate() + 1);
-  const itDateStr = d.toLocaleDateString('it-IT', { timeZone: 'Europe/Rome' });
-  const [day, m, y] = itDateStr.split('/');
-  return `${y}-${m.padStart(2, '0')}-${day.padStart(2, '0')}`;
+function toIsoDateString(utcDate) {
+  return utcDate.toISOString().slice(0, 10);
+}
+
+function parseClientDateUtc(dateStr) {
+  if (!dateStr || typeof dateStr !== 'string') return null;
+  const match = dateStr.trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const d = new Date(Date.UTC(year, month - 1, day));
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function formatDateItalian(dateStr) {
+  if (!dateStr || typeof dateStr !== 'string') return 'N/D';
+  const match = dateStr.trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return dateStr;
+  return `${match[3]}/${match[2]}/${match[1]}`;
 }
 
 async function run() {
-  const todayStr = getTodayString();
-  const tomorrowStr = getTomorrowString();
+  const todayDate = getRomeUtcDate(0);
+  const tomorrowDate = getRomeUtcDate(1);
+  const threeDaysDate = getRomeUtcDate(3);
+
+  const todayStr = toIsoDateString(todayDate);
+  const tomorrowStr = toIsoDateString(tomorrowDate);
+
   console.log('=== Controllo Scadenze Giornaliero ===');
-  console.log('Data Oggi:', todayStr, '| Data Domani:', tomorrowStr);
+  console.log('Data Oggi (Europe/Rome):', todayStr, '| Data Domani:', tomorrowStr, '| FORCE_RESEND:', forceResend);
 
   // Recupera tutti gli utenti tramite Firebase Auth (include sempre tutti gli utenti registrati)
   const userMap = new Map();
@@ -102,7 +129,16 @@ async function run() {
       continue;
     }
 
-    console.log(`Email destinatario: ${recipientEmail}`);
+    const isAdmin = ADMIN_EMAILS.includes(String(recipientEmail).toLowerCase());
+    console.log(`Email destinatario: ${recipientEmail} (admin: ${isAdmin})`);
+
+    // Protezione anti-duplicato giornaliero
+    const notifRef = db.collection('users').doc(uid).collection('notifications').doc('dailyCheck');
+    const notifSnap = await notifRef.get();
+    if (!forceResend && notifSnap.exists && notifSnap.data().lastSentDate === todayStr) {
+      console.log(`Notifiche già inviate oggi (${todayStr}) per ${recipientEmail}, salto per evitare duplicati.`);
+      continue;
+    }
 
     // Leggi preferenze notifiche da settings: /users/{uid}/settings/data
     const settingsSnap = await db.collection('users').doc(uid).collection('settings').doc('data').get();
@@ -116,26 +152,19 @@ async function run() {
     const clientsToNotify = [];
     let expiringNext3Days = 0;
 
-    const todayDate = getRomeDate(0);
-    const tomorrowDate = getRomeDate(1);
-    const threeDaysDate = getRomeDate(3);
+    const targetDate = notifyTiming === 'day_before' ? tomorrowDate : todayDate;
+    const targetStr = notifyTiming === 'day_before' ? tomorrowStr : todayStr;
 
     clientsSnap.forEach(docSnap => {
       const c = docSnap.data();
       if (!c.isActive || !c.expirationDate) return;
 
-      const exp = new Date(c.expirationDate);
-      exp.setHours(0, 0, 0, 0);
+      const exp = parseClientDateUtc(c.expirationDate);
+      if (!exp) return;
 
       // In scadenza oggi o domani in base alla preferenza utente
-      if (notifyTiming === 'day_before') {
-        if (c.expirationDate === tomorrowStr || exp.getTime() === tomorrowDate.getTime()) {
-          clientsToNotify.push(c);
-        }
-      } else {
-        if (c.expirationDate === todayStr || exp.getTime() === todayDate.getTime()) {
-          clientsToNotify.push(c);
-        }
+      if (c.expirationDate === targetStr || exp.getTime() === targetDate.getTime()) {
+        clientsToNotify.push(c);
       }
 
       // Conteggio in scadenza nei prossimi 3 giorni (da oggi a 3 giorni)
@@ -144,18 +173,20 @@ async function run() {
       }
     });
 
+    let sentCount = 0;
+
     // 1. Invio Notifiche Scadenza
     if (clientsToNotify.length > 0) {
       console.log(`Trovati ${clientsToNotify.length} account da notificare (${notifyTiming}).`);
       for (const client of clientsToNotify) {
         const isDayBefore = notifyTiming === 'day_before';
-        const subject = isDayBefore 
-          ? `[PZ8] Promemoria Scadenza Domani: ${client.user}` 
+        const subject = isDayBefore
+          ? `[PZ8] Promemoria Scadenza Domani: ${client.user}`
           : `[PZ8] Scadenza Oggi: ${client.user}`;
 
         const emailBody = (isDayBefore ? `In scadenza DOMANI IPTV di "${client.user}"\n` : `Scaduto oggi IPTV di "${client.user}"\n`) +
                           `Nome contatto: "${client.contactName || 'N/D'}"\n` +
-                          `Data scadenza: "${client.expirationDate}"\n` +
+                          `Data scadenza: "${formatDateItalian(client.expirationDate)}"\n` +
                           `Costo mensile: "${client.monthlyCost || 10}€"`;
 
         console.log(`Inviando notifica scadenza a ${recipientEmail} per "${client.user}"...`);
@@ -166,7 +197,12 @@ async function run() {
             subject: subject,
             text: emailBody
           });
-          console.log(`✓ Email inviata con successo. ID:`, res?.data?.id || res?.id || 'ok');
+          if (res?.error) {
+            console.error(`✗ Errore Resend per ${client.user}:`, res.error);
+          } else {
+            sentCount++;
+            console.log(`✓ Email inviata con successo. ID:`, res?.data?.id || res?.id || 'ok');
+          }
         } catch (mailErr) {
           console.error(`✗ Errore invio email per ${client.user}:`, mailErr);
         }
@@ -175,8 +211,8 @@ async function run() {
       console.log(`Nessun account da notificare per ${recipientEmail} con criterio "${notifyTiming}".`);
     }
 
-    // 2. Alert Scorte Crediti Insufficienti
-    if (profileData.creditsBalance !== undefined) {
+    // 2. Alert Scorte Crediti Insufficienti (solo Admin)
+    if (isAdmin && profileData.creditsBalance !== undefined) {
       const balance = Number(profileData.creditsBalance) || 0;
       // Fabbisogno minimo: almeno 1 credito per ciascun utente in scadenza nei prossimi 3 giorni
       const minNeeded = expiringNext3Days;
@@ -196,11 +232,26 @@ async function run() {
             subject: '⚠️ Alert PZ8: Crediti Insufficienti per Rinnovi',
             text: alertBody
           });
-          console.log(`✓ Alert crediti inviato con successo a ${recipientEmail}. ID:`, res?.data?.id || res?.id || 'ok');
+          if (res?.error) {
+            console.error(`✗ Errore Resend per alert crediti:`, res.error);
+          } else {
+            sentCount++;
+            console.log(`✓ Alert crediti inviato con successo a ${recipientEmail}. ID:`, res?.data?.id || res?.id || 'ok');
+          }
         } catch (alertErr) {
           console.error(`✗ Errore invio alert crediti:`, alertErr);
         }
       }
+    }
+
+    // Salva stato invio giornaliero se almeno una mail è partita con successo
+    if (sentCount > 0) {
+      await notifRef.set({
+        lastSentDate: todayStr,
+        lastSentAt: new Date().toISOString(),
+        lastSentCount: sentCount
+      }, { merge: true });
+      console.log(`✓ Registrato invio giornaliero (${sentCount} email) per ${todayStr}.`);
     }
   }
 
