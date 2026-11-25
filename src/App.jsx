@@ -80,7 +80,7 @@ export default function App() {
     return saved !== null ? Number(saved) : 3;
   });
 
-  // Email Notification timing: 'today' (giorno scadenza) o 'day_before' (giorno prima)
+  // Email Notification timing: 'today' (giorno scadenza), 'day_before' (1 giorno prima), 'two_days_before' (2 giorni prima)
   const [notifyTiming, setNotifyTiming] = useState(() => {
     const saved = localStorage.getItem('pz8_notify_timing');
     return saved || 'today';
@@ -227,13 +227,18 @@ export default function App() {
   };
 
   const handleChangeNotifyTiming = async (timing) => {
-    if (timing !== 'today' && timing !== 'day_before') return;
+    const timingLabels = {
+      today: 'Il giorno della scadenza',
+      day_before: 'Il giorno prima (24h)',
+      two_days_before: '2 giorni prima (48h)'
+    };
+    if (!timingLabels[timing]) return;
     setNotifyTiming(timing);
     localStorage.setItem('pz8_notify_timing', timing);
     if (user) {
       await setDoc(doc(db, 'users', user.uid, 'settings', 'data'), { notifyTiming: timing }, { merge: true });
     }
-    notify(`Avviso email impostato: ${timing === 'day_before' ? 'Il giorno prima' : 'Il giorno della scadenza'}`, 'success');
+    notify(`Avviso email impostato: ${timingLabels[timing]}`, 'success');
   };
 
   // Auth Handlers

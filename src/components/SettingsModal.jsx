@@ -256,10 +256,10 @@ export default function SettingsModal({
             </div>
 
             <p className="text-[11px] text-slate-400 leading-relaxed">
-              Scegli se desideri ricevere la mail per gli account IPTV il giorno stesso della scadenza oppure il giorno prima.
+              Scegli quando desideri ricevere la mail per gli account IPTV: il giorno stesso della scadenza, 1 giorno prima oppure 2 giorni prima.
             </p>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
               <button
                 type="button"
                 onClick={() => onChangeNotifyTiming('today')}
@@ -293,6 +293,24 @@ export default function SettingsModal({
                 </div>
                 <p className="text-[10px] text-slate-400 leading-tight">
                   Email inviata la mattina prima per preparare il rinnovo
+                </p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => onChangeNotifyTiming('two_days_before')}
+                className={`p-3 rounded-xl border text-left transition-all ${
+                  notifyTiming === 'two_days_before'
+                    ? 'bg-[#00ff9d]/15 border-[#00ff9d] text-white shadow-[0_0_10px_rgba(0,255,157,0.2)]'
+                    : 'bg-[#121a2c] border-[#1f2d4d] text-slate-400 hover:text-white hover:bg-[#1a263f]'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <span className="font-bold text-xs text-white">2 giorni prima (48h)</span>
+                  {notifyTiming === 'two_days_before' && <Check className="w-3.5 h-3.5 text-[#00ff9d]" />}
+                </div>
+                <p className="text-[10px] text-slate-400 leading-tight">
+                  Email inviata 2 giorni prima della scadenza
                 </p>
               </button>
             </div>

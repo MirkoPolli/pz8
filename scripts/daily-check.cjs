@@ -78,13 +78,15 @@ function formatDateItalian(dateStr) {
 async function run() {
   const todayDate = getRomeUtcDate(0);
   const tomorrowDate = getRomeUtcDate(1);
+  const twoDaysDate = getRomeUtcDate(2);
   const threeDaysDate = getRomeUtcDate(3);
 
   const todayStr = toIsoDateString(todayDate);
   const tomorrowStr = toIsoDateString(tomorrowDate);
+  const twoDaysStr = toIsoDateString(twoDaysDate);
 
   console.log('=== Controllo Scadenze Giornaliero ===');
-  console.log('Data Oggi (Europe/Rome):', todayStr, '| Data Domani:', tomorrowStr, '| FORCE_RESEND:', forceResend);
+  console.log('Data Oggi (Europe/Rome):', todayStr, '| Domani:', tomorrowStr, '| Tra 2gg:', twoDaysStr, '| FORCE_RESEND:', forceResend);
 
   // Recupera tutti gli utenti tramite Firebase Auth (include sempre tutti gli utenti registrati)
   const userMap = new Map();
@@ -143,17 +145,41 @@ async function run() {
     // Leggi preferenze notifiche da settings: /users/{uid}/settings/data
     const settingsSnap = await db.collection('users').doc(uid).collection('settings').doc('data').get();
     const settingsData = settingsSnap.exists ? settingsSnap.data() : {};
-    // notifyTiming: 'today' (default) oppure 'day_before'
-    const notifyTiming = settingsData.notifyTiming === 'day_before' ? 'day_before' : 'today';
-    console.log(`Preferenza invio notifica: ${notifyTiming === 'day_before' ? 'Il giorno prima della scadenza' : 'Il giorno della scadenza'}`);
+    // notifyTiming: 'today' (default), 'day_before' oppure 'two_days_before'
+    const timingConfig = {
+      today: {
+        label: 'Il giorno della scadenza',
+        targetDate: todayDate,
+        targetStr: todayStr,
+        subjectPrefix: '[PZ8] Scadenza Oggi',
+        bodyLead: (userName) => `Scaduto oggi IPTV di "${userName}"\n`
+      },
+      day_before: {
+        label: 'Il giorno prima della scadenza',
+        targetDate: tomorrowDate,
+        targetStr: tomorrowStr,
+        subjectPrefix: '[PZ8] Promemoria Scadenza Domani',
+        bodyLead: (userName) => `In scadenza DOMANI IPTV di "${userName}"\n`
+      },
+      two_days_before: {
+        label: '2 giorni prima della scadenza',
+        targetDate: twoDaysDate,
+        targetStr: twoDaysStr,
+        subjectPrefix: '[PZ8] Promemoria Scadenza tra 2 giorni',
+        bodyLead: (userName) => `In scadenza TRA 2 GIORNI IPTV di "${userName}"\n`
+      }
+    };
+    const notifyTiming = timingConfig[settingsData.notifyTiming] ? settingsData.notifyTiming : 'today';
+    const activeTiming = timingConfig[notifyTiming];
+    console.log(`Preferenza invio notifica: ${activeTiming.label}`);
 
     // Leggi clienti dell'utente
     const clientsSnap = await db.collection('users').doc(uid).collection('clients').get();
     const clientsToNotify = [];
     let expiringNext3Days = 0;
 
-    const targetDate = notifyTiming === 'day_before' ? tomorrowDate : todayDate;
-    const targetStr = notifyTiming === 'day_before' ? tomorrowStr : todayStr;
+    const targetDate = activeTiming.targetDate;
+    const targetStr = activeTiming.targetStr;
 
     clientsSnap.forEach(docSnap => {
       const c = docSnap.data();
@@ -162,7 +188,7 @@ async function run() {
       const exp = parseClientDateUtc(c.expirationDate);
       if (!exp) return;
 
-      // In scadenza oggi o domani in base alla preferenza utente
+      // In scadenza oggi, domani o tra 2 giorni in base alla preferenza utente
       if (c.expirationDate === targetStr || exp.getTime() === targetDate.getTime()) {
         clientsToNotify.push(c);
       }
@@ -179,12 +205,9 @@ async function run() {
     if (clientsToNotify.length > 0) {
       console.log(`Trovati ${clientsToNotify.length} account da notificare (${notifyTiming}).`);
       for (const client of clientsToNotify) {
-        const isDayBefore = notifyTiming === 'day_before';
-        const subject = isDayBefore
-          ? `[PZ8] Promemoria Scadenza Domani: ${client.user}`
-          : `[PZ8] Scadenza Oggi: ${client.user}`;
+        const subject = `${activeTiming.subjectPrefix}: ${client.user}`;
 
-        const emailBody = (isDayBefore ? `In scadenza DOMANI IPTV di "${client.user}"\n` : `Scaduto oggi IPTV di "${client.user}"\n`) +
+        const emailBody = activeTiming.bodyLead(client.user) +
                           `Nome contatto: "${client.contactName || 'N/D'}"\n` +
                           `Data scadenza: "${formatDateItalian(client.expirationDate)}"\n` +
                           `Costo mensile: "${client.monthlyCost || 10}€"`;
