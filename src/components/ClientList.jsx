@@ -301,16 +301,11 @@ export default function ClientList({
                     className="p-3 rounded-lg bg-[#0a070e] border border-[#ff3366]/25 hover:border-[#ff3366]/50 transition-all flex flex-col justify-between"
                   >
                     <div>
-                      <div className="flex items-start justify-between gap-2 mb-2">
+                      <div className="flex items-center justify-between gap-2 mb-2">
                         <div className="min-w-0">
                           <span className="font-bold text-white text-xs truncate block" title={debtor.name}>
                             {debtor.name}
                           </span>
-                          {debtor.phone && (
-                            <span className="text-[10px] text-slate-400 font-mono">
-                              {debtor.phone}
-                            </span>
-                          )}
                         </div>
                         <span className="px-2 py-0.5 rounded text-xs font-mono font-bold bg-[#ff3366]/20 text-[#ff3366] border border-[#ff3366]/50 flex-shrink-0">
                           €{debtor.totalDue}
