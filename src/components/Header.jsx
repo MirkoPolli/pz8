@@ -15,6 +15,7 @@ export default function Header({
   user, 
   creditsBalance, 
   isAdmin,
+  onGoHome,
   onOpenCreditModal, 
   onOpenNewUserModal, 
   onOpenSettingsModal,
@@ -45,7 +46,11 @@ export default function Header({
       <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
         
         {/* Logo & Terminal Title (No 'v2 geek' badge) */}
-        <div className="flex items-center gap-3">
+        <div
+          onClick={onGoHome}
+          className={`flex items-center gap-3 ${onGoHome ? 'cursor-pointer group' : ''}`}
+          title={onGoHome ? 'Torna alla dashboard' : undefined}
+        >
           <div className="relative flex items-center justify-center w-10 h-10 rounded-lg bg-[#00ff9d]/10 border border-[#00ff9d]/30 text-[#00ff9d]">
             <Terminal className="w-5 h-5" />
             <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-[#00ff9d] rounded-full animate-ping opacity-75"></span>

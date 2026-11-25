@@ -11,8 +11,10 @@ import {
 export default function StatsBar({ 
   clients, 
   creditsBalance, 
+  onFilterActive,
   onFilterExpiring, 
   onFilterUnpaid,
+  onOpenAnalytics,
   onOpenCreditModal,
   isAdmin = true,
   tokenCost = 3
@@ -78,7 +80,11 @@ export default function StatsBar({
       <div className={`grid grid-cols-2 ${isAdmin ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-3`}>
         
         {/* Active Accounts */}
-        <div className="p-3.5 rounded-xl bg-[#111726] border border-[#1d263b] flex items-center justify-between">
+        <div
+          onClick={onFilterActive}
+          className="p-3.5 rounded-xl bg-[#111726] border border-[#1d263b] hover:border-[#00ff9d]/50 hover:bg-[#00ff9d]/[0.04] cursor-pointer flex items-center justify-between transition-all"
+          title="Mostra account attivi"
+        >
           <div>
             <div className="text-[11px] font-mono text-slate-400 uppercase tracking-wider">Account Attivi</div>
             <div className="text-xl sm:text-2xl font-mono font-bold text-white mt-1">
@@ -128,10 +134,19 @@ export default function StatsBar({
           </div>
         )}
 
-        {/* Monthly Revenue */}
-        <div className="p-3.5 rounded-xl bg-[#111726] border border-[#1d263b] flex items-center justify-between">
+        {/* Monthly Revenue - Cliccabile -> Statistiche & KPI */}
+        <div
+          onClick={onOpenAnalytics}
+          className="p-3.5 rounded-xl bg-[#111726] border border-[#1d263b] hover:border-[#00f0ff]/60 hover:bg-[#00f0ff]/[0.05] cursor-pointer flex items-center justify-between transition-all group"
+          title="Apri Statistiche & KPI"
+        >
           <div>
-            <div className="text-[11px] font-mono text-slate-400 uppercase tracking-wider">Incasso Netto/Mese</div>
+            <div className="text-[11px] font-mono text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+              <span>Incasso Netto/Mese</span>
+              <span className="px-1.5 py-0.2 rounded text-[9px] bg-[#00f0ff]/10 text-[#00f0ff] border border-[#00f0ff]/30 group-hover:bg-[#00f0ff] group-hover:text-black font-bold transition-colors">
+                KPI ↗
+              </span>
+            </div>
             <div className="text-xl sm:text-2xl font-mono font-bold text-[#00f0ff] mt-1">
               € {monthlyRevenue.toLocaleString('it-IT', { minimumFractionDigits: 0 })}
             </div>
@@ -139,7 +154,7 @@ export default function StatsBar({
               lordo €{monthlyGross} − crediti €{monthlyCreditCost} ({creditCostPerMonth}€/credito)
             </div>
           </div>
-          <div className="w-9 h-9 rounded-lg bg-[#00f0ff]/10 border border-[#00f0ff]/30 text-[#00f0ff] flex items-center justify-center">
+          <div className="w-9 h-9 rounded-lg bg-[#00f0ff]/10 border border-[#00f0ff]/30 text-[#00f0ff] flex items-center justify-center group-hover:scale-105 transition-transform">
             <TrendingUp className="w-5 h-5" />
           </div>
         </div>

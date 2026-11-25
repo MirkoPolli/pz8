@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Header from './components/Header';
 import StatsBar from './components/StatsBar';
+import StatsAnalyticsPage from './components/StatsAnalyticsPage';
 import ClientList from './components/ClientList';
 import UserModal from './components/UserModal';
 import CreditModal from './components/CreditModal';
@@ -36,6 +37,7 @@ export default function App() {
   const [contacts, setContacts] = useState([]);
   const [creditData, setCreditData] = useState({ creditsBalance: 0, creditCostUnit: 3.0, history: [] });
 
+  const [activeView, setActiveView] = useState('dashboard'); // 'dashboard' | 'analytics'
   const [filterTab, setFilterTab] = useState('active');
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [clientToEdit, setClientToEdit] = useState(null);
@@ -704,6 +706,7 @@ export default function App() {
         user={user}
         creditsBalance={creditData.creditsBalance || 0}
         isAdmin={isAdmin}
+        onGoHome={() => setActiveView('dashboard')}
         onOpenCreditModal={() => setIsCreditModalOpen(true)}
         onOpenNewUserModal={() => {
           setClientToEdit(null);
@@ -718,41 +721,63 @@ export default function App() {
       {/* Main Content */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-6">
         
-        {/* KPI & Stats Dashboard */}
-        <StatsBar
-          clients={clients}
-          creditsBalance={creditData.creditsBalance || 0}
-          isAdmin={isAdmin}
-          tokenCost={tokenCost}
-          onFilterExpiring={() => setFilterTab('expiring')}
-          onFilterUnpaid={() => setFilterTab('unpaid')}
-          onOpenCreditModal={() => setIsCreditModalOpen(true)}
-        />
+        {activeView === 'analytics' ? (
+          <StatsAnalyticsPage
+            clients={clients}
+            creditData={creditData}
+            isAdmin={isAdmin}
+            tokenCost={tokenCost}
+            onBack={() => setActiveView('dashboard')}
+            onJumpToFilter={(tab) => {
+              setFilterTab(tab);
+              setActiveView('dashboard');
+            }}
+            onOpenCreditModal={() => setIsCreditModalOpen(true)}
+          />
+        ) : (
+          <>
+            {/* KPI & Stats Dashboard */}
+            <StatsBar
+              clients={clients}
+              creditsBalance={creditData.creditsBalance || 0}
+              isAdmin={isAdmin}
+              tokenCost={tokenCost}
+              onFilterActive={() => setFilterTab('active')}
+              onFilterExpiring={() => setFilterTab('expiring')}
+              onFilterUnpaid={() => setFilterTab('unpaid')}
+              onOpenAnalytics={() => {
+                setActiveView('analytics');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              onOpenCreditModal={() => setIsCreditModalOpen(true)}
+            />
 
-        {/* Client Table & List */}
-        <ClientList
-          clients={clients}
-          onRequestRenew={handleRequestRenew}
-          onUndoRenew={handleUndoRenew}
-          onEdit={(client) => {
-            setClientToEdit(client);
-            setIsUserModalOpen(true);
-          }}
-          onDelete={(clientId) => {
-            const c = clients.find(x => x.id === clientId);
-            if (c) {
-              setDeleteModalState({ isOpen: true, client: c });
-            }
-          }}
-          onToggleActive={handleToggleActive}
-          filterTab={filterTab}
-          setFilterTab={setFilterTab}
-          creditsBalance={creditData.creditsBalance || 0}
-          visibleColumns={visibleColumns}
-          isAdmin={isAdmin}
-          onQuickPay={handleQuickPay}
-          onOpenPaymentModal={(client) => setPaymentModalState({ isOpen: true, client })}
-        />
+            {/* Client Table & List */}
+            <ClientList
+              clients={clients}
+              onRequestRenew={handleRequestRenew}
+              onUndoRenew={handleUndoRenew}
+              onEdit={(client) => {
+                setClientToEdit(client);
+                setIsUserModalOpen(true);
+              }}
+              onDelete={(clientId) => {
+                const c = clients.find(x => x.id === clientId);
+                if (c) {
+                  setDeleteModalState({ isOpen: true, client: c });
+                }
+              }}
+              onToggleActive={handleToggleActive}
+              filterTab={filterTab}
+              setFilterTab={setFilterTab}
+              creditsBalance={creditData.creditsBalance || 0}
+              visibleColumns={visibleColumns}
+              isAdmin={isAdmin}
+              onQuickPay={handleQuickPay}
+              onOpenPaymentModal={(client) => setPaymentModalState({ isOpen: true, client })}
+            />
+          </>
+        )}
 
       </main>
 
